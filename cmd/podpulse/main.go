@@ -182,11 +182,35 @@ func runExplain(g globalFlags, args []string) {
 	if a.Template != "" {
 		fmt.Printf("  template:  %s\n", a.Template)
 	}
-	if a.RCA != "" {
-		fmt.Printf("\n  RCA: %s\n", a.RCA)
+	if a.Headline != "" {
+		fmt.Printf("\n  %s\n", a.Headline)
 	}
-	if a.RollbackHint != "" {
-		fmt.Printf("\n  Suggested:\n    %s\n", a.RollbackHint)
+	if a.ShortStory != "" {
+		fmt.Printf("  %s\n", a.ShortStory)
+	}
+	if a.ImpactLine != "" {
+		fmt.Printf("  Impact: %s\n", a.ImpactLine)
+	}
+	if a.Confidence > 0 {
+		fmt.Printf("  Confidence: %d%%\n", a.Confidence)
+	}
+	if len(a.Timeline) > 0 {
+		fmt.Println("\n  Timeline:")
+		for _, e := range a.Timeline {
+			fmt.Printf("    %s  %s\n", e.When.Format("15:04"), e.Label)
+		}
+	}
+	if len(a.Suggestions) > 0 {
+		fmt.Println("\n  Suggestions:")
+		for _, s := range a.Suggestions {
+			fmt.Printf("    • %s\n", s.Title)
+			if s.Command != "" {
+				fmt.Printf("        $ %s\n", s.Command)
+			}
+			if s.Why != "" {
+				fmt.Printf("        why: %s\n", s.Why)
+			}
+		}
 	}
 	if len(a.Sample) > 0 {
 		fmt.Printf("\n  Sample line:\n    %s\n", a.Sample[0])

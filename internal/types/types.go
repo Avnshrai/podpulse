@@ -57,6 +57,33 @@ const (
 	AnomalyRestartRate     AnomalyKind = "restart_rate"
 )
 
+// Suggestion is one actionable troubleshooting step attached to an
+// anomaly. The dashboard shows them as a list of kubectl-style
+// "investigation cards" instead of a single rollback command.
+type Suggestion struct {
+	Title   string `json:"title"`
+	Command string `json:"command,omitempty"`
+	Why     string `json:"why,omitempty"`
+}
+
+// TimelineEvent is one step in the "what happened, in order" view.
+type TimelineEvent struct {
+	When  time.Time `json:"when"`
+	Label string    `json:"label"` // e.g. "Deployment rolled out", "First error seen"
+}
+
+// ImpactLevel grades the user-visible blast radius of an anomaly.
+// Independent of Severity, which is used for routing/dedup; this is the
+// human-friendly framing shown next to the headline.
+type ImpactLevel string
+
+const (
+	ImpactLow      ImpactLevel = "low"      // 1 pod
+	ImpactMedium   ImpactLevel = "medium"   // multiple pods, single workload
+	ImpactHigh     ImpactLevel = "high"     // multiple workloads in a namespace
+	ImpactCritical ImpactLevel = "critical" // cross-namespace / cluster-wide
+)
+
 // Anomaly is the unit emitted by the detector and consumed by the alert
 // dispatcher, the CLI, and the web view.
 type Anomaly struct {
@@ -72,17 +99,55 @@ type Anomaly struct {
 	Template string `json:"template,omitempty"`
 
 	// Sample is one or two recent raw lines that matched the template,
-	// useful for the alert and the UI drill-down.
+	// redacted before storage.
 	Sample []string `json:"sample,omitempty"`
 
-	// AffectedPods counts unique pods seen emitting this template within
-	// the correlation window. Drives the blast-radius score.
-	AffectedPods int `json:"affected_pods"`
+	// AffectedPods/Containers/Nodes drive the impact score.
+	AffectedPods       int `json:"affected_pods"`
+	AffectedContainers int `json:"affected_containers,omitempty"`
+	AffectedNodes      int `json:"affected_nodes,omitempty"`
 
-	// RCA is the human-readable root-cause sentence. Populated by the
-	// RCA engine. Empty for stub anomalies.
+	// FirstSeenInVersion is true when the template is genuinely new on
+	// the workload's current image-digest.
+	FirstSeenInVersion bool `json:"first_seen_in_version,omitempty"`
+
+	// --- human-readable framing ---
+
+	// Headline is the one-liner shown at the top of the card, e.g.
+	// "User not found errors started 7 min after rollout".
+	Headline string `json:"headline,omitempty"`
+
+	// ShortStory is the human paragraph: what happened, on which workload,
+	// affecting how many pods. No tech jargon.
+	ShortStory string `json:"short_story,omitempty"`
+
+	// RCA is the kept-for-backwards-compat templated sentence with full
+	// technical detail (workload path, image-digest, etc.).
 	RCA string `json:"rca,omitempty"`
 
-	// RollbackHint is a copy-pasteable kubectl command, when applicable.
-	RollbackHint string `json:"rollback_hint,omitempty"`
+	// Impact is the human-friendly blast-radius framing.
+	Impact      ImpactLevel `json:"impact_level,omitempty"`
+	ImpactLine  string      `json:"impact_line,omitempty"` // "Affecting 3 pods in gpu-paas-billing"
+
+	// Timeline lists the 2-4 events that frame the incident in order:
+	// most recent rollout, first error seen, rate-spike, etc.
+	Timeline []TimelineEvent `json:"timeline,omitempty"`
+
+	// Confidence is 0-100 — our internal certainty that this anomaly is
+	// real and not warm-up noise. Deployment-correlated anomalies score
+	// the highest.
+	Confidence int `json:"confidence,omitempty"`
+
+	// DeploymentCorrelated is true when the anomaly fired within a
+	// short window after a rollout — the headline reflects this.
+	DeploymentCorrelated bool `json:"deployment_correlated,omitempty"`
+
+	// Variants holds additional templates collapsed into this anomaly
+	// when grouping similar errors (e.g. "User not found" + "User not
+	// authorized to validate tenant"). The card shows the first as the
+	// headline and a "+N variants" badge.
+	Variants []string `json:"variants,omitempty"`
+
+	// Suggestions is a list of relevant kubectl / diagnostic commands.
+	Suggestions []Suggestion `json:"suggestions,omitempty"`
 }

@@ -93,13 +93,26 @@ func blocks(a types.Anomaly) []map[string]any {
 		})
 	}
 
-	if a.RollbackHint != "" {
+	if len(a.Suggestions) > 0 {
+		var b strings.Builder
+		b.WriteString("*Suggested investigation steps*")
+		for i, s := range a.Suggestions {
+			if i >= 4 {
+				b.WriteString("\n_…and more in the dashboard_")
+				break
+			}
+			b.WriteString("\n• *")
+			b.WriteString(s.Title)
+			b.WriteString("*")
+			if s.Command != "" {
+				b.WriteString("\n```")
+				b.WriteString(s.Command)
+				b.WriteString("```")
+			}
+		}
 		out = append(out, map[string]any{
 			"type": "section",
-			"text": map[string]any{
-				"type": "mrkdwn",
-				"text": fmt.Sprintf("*Suggested*\n```%s```", a.RollbackHint),
-			},
+			"text": map[string]any{"type": "mrkdwn", "text": b.String()},
 		})
 	}
 

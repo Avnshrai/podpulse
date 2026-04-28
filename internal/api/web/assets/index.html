@@ -9,227 +9,997 @@
     --bg: #0b0d12;
     --panel: #141821;
     --panel-2: #1a1f2b;
-    --line: #232938;
+    --panel-3: #232938;
+    --border: #232938;
     --text: #e6e8ee;
     --muted: #8a93a6;
     --accent: #4cc2ff;
-    --low: #69d199;
-    --medium: #f7c548;
-    --high: #ff7a59;
+    --accent-2: #6c5ce7;
+    --low:      #69d199;
+    --medium:   #f7c548;
+    --high:     #ff8a3d;
     --critical: #ff4d6d;
+    --ok:       #69d199;
+    --warn:     #ff8a3d;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
-    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
     background: var(--bg);
     color: var(--text);
-    overflow-x: hidden;
+    overflow: hidden;
   }
-  header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 18px 28px;
-    border-bottom: 1px solid var(--line);
-    background: linear-gradient(180deg, #0e1119, #0b0d12);
-    position: sticky; top: 0; z-index: 5;
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  /* App grid */
+  .app {
+    display: grid;
+    grid-template-columns: 240px 1fr 320px;
+    grid-template-rows: 60px 1fr;
+    grid-template-areas:
+      "side topbar topbar"
+      "side main rail";
+    height: 100vh;
   }
-  header h1 {
-    font-size: 16px; margin: 0; letter-spacing: .3px;
+
+  /* Sidebar */
+  .side {
+    grid-area: side;
+    background: linear-gradient(180deg, #0e1119 0%, #0b0d12 100%);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 18px 12px;
+    gap: 4px;
+  }
+  .brand {
     display: flex; align-items: center; gap: 10px;
+    padding: 0 8px 18px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--border);
   }
-  .pulse {
-    display: inline-block; width: 12px; height: 12px;
+  .brand .pulse-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 60%);
+    position: relative;
+  }
+  .brand .pulse-dot::after {
+    content: ''; position: absolute; inset: 8px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 0 0 rgba(76, 194, 255, .6);
+    box-shadow: 0 0 0 0 rgba(76, 194, 255, .55);
     animation: pulse 1.6s ease-out infinite;
   }
   @keyframes pulse {
-    0%   { transform: scale(.85); box-shadow: 0 0 0 0 rgba(76, 194, 255, .55); }
-    70%  { transform: scale(1);   box-shadow: 0 0 0 14px rgba(76, 194, 255, 0); }
-    100% { transform: scale(.85); box-shadow: 0 0 0 0 rgba(76, 194, 255, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(76, 194, 255, .55); }
+    70% { box-shadow: 0 0 0 10px rgba(76, 194, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(76, 194, 255, 0); }
   }
-  header .meta {
+  .brand .name { font-weight: 600; font-size: 16px; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .nav-item:hover { background: var(--panel); color: var(--text); }
+  .nav-item.active { background: var(--panel); color: var(--accent); }
+  .nav-item .ic { width: 18px; height: 18px; opacity: .9; }
+  .nav-item .badge {
     margin-left: auto;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    font-size: 12px;
-  }
-  main {
-    padding: 24px 28px 60px;
-    max-width: 1100px;
-    margin: 0 auto;
-  }
-  .empty {
-    text-align: center;
-    color: var(--muted);
-    padding: 80px 0;
-  }
-  .empty .pulse {
-    width: 28px; height: 28px;
-    margin-bottom: 18px;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-left-width: 4px;
+    background: var(--panel-3);
+    color: var(--text);
+    font-size: 11px;
+    padding: 1px 7px;
     border-radius: 10px;
-    padding: 14px 18px;
-    margin-bottom: 12px;
-    overflow: hidden;
-    animation: slideIn .4s cubic-bezier(.2,.8,.2,1) both;
+    min-width: 20px; text-align: center;
   }
-  .card.flash {
-    animation: slideIn .4s cubic-bezier(.2,.8,.2,1) both, flash 1.2s ease-out;
+  .side-foot {
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
   }
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateY(-8px) scale(.99); }
-    to   { opacity: 1; transform: translateY(0)    scale(1); }
+  .storage-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
   }
-  @keyframes flash {
-    0%   { background: var(--panel); }
-    20%  { background: rgba(76, 194, 255, .12); }
-    100% { background: var(--panel); }
+  .storage-card .row1 { display: flex; align-items: center; gap: 8px; color: var(--ok); font-size: 12px; }
+  .storage-card .row2 { color: var(--text); font-size: 12px; margin-top: 4px; }
+  .storage-card .row3 { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .user-card {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px;
   }
-  .card.sev-low      { border-left-color: var(--low); }
-  .card.sev-medium   { border-left-color: var(--medium); }
-  .card.sev-high     { border-left-color: var(--high); }
-  .card.sev-critical { border-left-color: var(--critical); }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-2); display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .user-card .name { font-size: 13px; color: var(--text); }
+  .user-card .role { font-size: 11px; color: var(--muted); }
 
-  .card .top {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  /* Topbar */
+  .topbar {
+    grid-area: topbar;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 22px;
+    gap: 16px;
+    background: rgba(11,13,18,.85);
+    backdrop-filter: blur(8px);
   }
-  .card .kind {
-    font-weight: 600; letter-spacing: .2px;
+  .topbar h1 { margin: 0; font-size: 17px; font-weight: 600; }
+  .topbar .meta { margin-left: auto; display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: 13px; }
+  .bell { position: relative; padding: 6px; cursor: pointer; }
+  .bell .count {
+    position: absolute; top: -2px; right: -2px;
+    background: var(--critical); color: white;
+    border-radius: 10px;
+    font-size: 10px;
+    padding: 1px 5px;
+    min-width: 18px; text-align: center;
   }
-  .card .workload {
-    color: var(--accent);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13px;
+
+  /* Main */
+  .main {
+    grid-area: main;
+    overflow-y: auto;
+    padding: 22px 28px 60px;
   }
-  .card .sev {
+
+  /* Right rail */
+  .rail {
+    grid-area: rail;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 18px 18px 60px;
+  }
+  .rail .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .rail .card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text); }
+  .rail .card .sub { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+
+  /* Severity tabs */
+  .tabs { display: flex; align-items: center; gap: 22px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 18px; }
+  .tab { color: var(--muted); cursor: pointer; padding-bottom: 4px; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 7px; }
+  .tab.active { color: var(--text); border-color: var(--accent); }
+  .tab .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .tab .num { background: var(--panel-2); border-radius: 10px; padding: 1px 8px; font-size: 12px; color: var(--text); }
+  .tab.crit .dot { background: var(--critical); }
+  .tab.high .dot { background: var(--high); }
+  .tab.med  .dot { background: var(--medium); }
+  .tab.low  .dot { background: var(--low); }
+
+  /* Right cluster — filters + time range */
+  .filters-row {
+    display: flex; align-items: center; gap: 12px; justify-content: flex-end;
+    margin-top: -54px; margin-bottom: 18px;
+  }
+  .pill {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 12px; color: var(--text); font-size: 13px;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .pill.primary { background: var(--accent-2); border-color: var(--accent-2); }
+  .pill svg { width: 14px; height: 14px; opacity: .8; }
+
+  /* Anomaly card */
+  .a-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--medium);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    animation: slideIn .35s ease;
+  }
+  .a-card.sev-low      { border-left-color: var(--low); }
+  .a-card.sev-medium   { border-left-color: var(--medium); }
+  .a-card.sev-high     { border-left-color: var(--high); }
+  .a-card.sev-critical { border-left-color: var(--critical); }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+  .a-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .a-tag {
+    background: rgba(247,197,72,.14); color: var(--medium);
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase;
+  }
+  .a-tag.crit  { background: rgba(255,77,109,.14); color: var(--critical); }
+  .a-tag.high  { background: rgba(255,138,61,.14); color: var(--high); }
+  .a-tag.low   { background: rgba(105,209,153,.14); color: var(--low); }
+  .a-tag.deploy { background: rgba(76,194,255,.14); color: var(--accent); }
+
+  .a-path { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .a-path .copy { margin-left: 6px; opacity: .5; cursor: pointer; }
+  .a-sev {
     margin-left: auto;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .8px;
-    padding: 2px 8px;
-    border-radius: 999px;
     background: var(--panel-2);
+    color: var(--medium);
+    text-transform: uppercase; font-size: 10.5px; letter-spacing: .8px;
+    padding: 3px 10px; border-radius: 12px; font-weight: 600;
   }
-  .card .sev.sev-low      { color: var(--low); }
-  .card .sev.sev-medium   { color: var(--medium); }
-  .card .sev.sev-high     { color: var(--high); }
-  .card .sev.sev-critical { color: var(--critical); }
+  .sev-medium .a-sev { color: var(--medium); }
+  .sev-high     .a-sev { color: var(--high); }
+  .sev-critical .a-sev { color: var(--critical); }
+  .sev-low      .a-sev { color: var(--low); }
 
-  .card .rca { margin-top: 8px; color: var(--text); }
-  .card .template {
-    margin-top: 10px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    color: var(--muted);
-    background: var(--panel-2);
-    padding: 8px 10px;
-    border-radius: 6px;
-    overflow-x: auto;
-    white-space: pre;
-  }
-  .card .hint {
-    margin-top: 10px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    color: var(--low);
-    background: rgba(105, 209, 153, .07);
-    border: 1px dashed rgba(105, 209, 153, .25);
-    padding: 8px 10px;
-    border-radius: 6px;
-  }
-  .card .hint::before {
-    content: "$ ";
-    opacity: .5;
-  }
-  .card .footer {
-    margin-top: 10px;
-    color: var(--muted);
+  .a-headline { font-size: 16px; font-weight: 600; margin: 6px 0 4px; }
+  .a-headline .first-seen {
+    margin-left: 8px;
+    background: rgba(108,92,231,.18);
+    color: #b9aef7;
     font-size: 11px;
-    display: flex; gap: 14px; flex-wrap: wrap;
+    padding: 2px 8px; border-radius: 10px;
+    font-weight: 500;
   }
+  .a-story { color: var(--text); margin-bottom: 6px; }
+  .a-story .impact { color: var(--muted); }
+  .a-story .impact.high { color: var(--high); }
+  .a-story .impact.critical { color: var(--critical); }
+
+  .a-meta { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; margin-top: 8px; }
+  .a-impact { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12.5px; }
+  .a-impact .row { display: flex; align-items: center; gap: 6px; }
+  .a-times { color: var(--muted); font-size: 12px; text-align: right; }
+  .a-times .ago { color: var(--text); }
+
+  .a-timeline {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    background: var(--panel-2); border-radius: 6px;
+    padding: 8px 10px; margin-top: 12px; font-size: 12px; color: var(--muted);
+  }
+  .a-timeline .step { display: inline-flex; align-items: center; gap: 6px; }
+  .a-timeline .step strong { color: var(--text); font-weight: 500; }
+  .a-timeline .arrow { color: var(--border); }
+
+  .a-confidence { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .a-confidence .bar { flex: 1; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .a-confidence .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+  .a-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+  .a-chip { background: var(--panel-2); border-radius: 5px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 5px; }
+  .a-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); font-size: 11.5px; }
+  .a-chip.variants { background: rgba(108,92,231,.12); color: #b9aef7; }
+
+  .a-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 6px; font-size: 12.5px; }
+  .btn:hover { background: var(--panel-3); }
+  .btn.primary { background: var(--accent-2); border-color: var(--accent-2); color: white; }
+  .btn.primary:hover { filter: brightness(1.05); }
+  .btn.ghost { background: transparent; }
+
+  .a-suggestions { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  .a-suggestions h4 { font-size: 12px; color: var(--muted); margin: 0 0 8px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+  .a-sug { background: var(--panel-2); border-radius: 6px; padding: 9px 10px; margin-bottom: 6px; }
+  .a-sug .t { font-size: 13px; font-weight: 500; }
+  .a-sug code { display: block; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ok); white-space: pre-wrap; word-break: break-all; }
+  .a-sug .why { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+  /* Generic cards / lists / table */
+  .pcard {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .pcard h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .row:last-child { border-bottom: 0; }
+  .row .name { font-size: 13px; }
+  .row .meta { color: var(--muted); font-size: 12px; }
+  .row .num { background: var(--panel-2); border-radius: 5px; padding: 2px 8px; font-size: 12px; }
+
+  /* Sparkline + severity totals (rail) */
+  .sev-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+  .sev-cell { background: var(--panel-2); border-radius: 6px; padding: 8px 10px; text-align: left; }
+  .sev-cell .n { font-size: 18px; font-weight: 600; }
+  .sev-cell .l { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .sev-cell.crit .n { color: var(--critical); }
+  .sev-cell.high .n { color: var(--high); }
+  .sev-cell.med  .n { color: var(--medium); }
+  .sev-cell.low  .n { color: var(--low); }
+  .sev-cell.crit .l, .sev-cell.high .l, .sev-cell.med .l, .sev-cell.low .l { color: inherit; opacity: .7; }
+
+  .total-line { display: flex; align-items: end; gap: 12px; }
+  .total-line .big { font-size: 36px; font-weight: 700; line-height: 1; }
+  .total-line .lbl { color: var(--muted); font-size: 12px; padding-bottom: 2px; }
+
+  /* Empty / loading */
+  .empty { padding: 60px 0; text-align: center; color: var(--muted); }
+  .empty .pulse-dot { display: block; width: 32px; height: 32px; margin: 0 auto 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(76,194,255,.55); animation: pulse 1.6s ease-out infinite; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 500; }
+
+  /* Severity dot helper */
+  .sevdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 5px; }
+  .sevdot.critical { background: var(--critical); }
+  .sevdot.high { background: var(--high); }
+  .sevdot.medium { background: var(--medium); }
+  .sevdot.low { background: var(--low); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.4); animation: slideIn .25s; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1><span class="pulse"></span> PodPulse</h1>
-  <span class="meta" id="meta">connecting…</span>
-</header>
-
-<main>
-  <div id="list">
-    <div class="empty" id="empty">
-      <div class="pulse"></div>
-      <div>Watching cluster heartbeat. No anomalies yet.</div>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="pulse-dot"></div>
+      <div class="name">PodPulse</div>
     </div>
-  </div>
-</main>
+    <a class="nav-item" data-route="overview">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+      Overview
+    </a>
+    <a class="nav-item active" data-route="anomalies">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 22h20L12 2zM12 9v5M12 18h.01"/></svg>
+      Anomalies <span class="badge" id="nav-anomalies-count">0</span>
+    </a>
+    <a class="nav-item" data-route="workloads">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
+      Workloads
+    </a>
+    <a class="nav-item" data-route="incidents">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16a2 2 0 01-2 2H6l-4 4V4a2 2 0 012-2h16a2 2 0 012 2v12z"/></svg>
+      Incidents
+    </a>
+    <a class="nav-item" data-route="deployments">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v18l7-5 7 5V3z"/></svg>
+      Deployments
+    </a>
+    <a class="nav-item" data-route="services">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+      Services
+    </a>
+    <a class="nav-item" data-route="events">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Events
+    </a>
+    <a class="nav-item" data-route="silences">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
+      Silences
+    </a>
+    <a class="nav-item" data-route="channels">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      Channels
+    </a>
+    <a class="nav-item" data-route="settings">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1l2.1-1.6-2-3.4-2.5.9a7 7 0 00-1.7-1L14 3h-4l-.8 2.5a7 7 0 00-1.7 1l-2.5-.9-2 3.4L5.1 11a7 7 0 000 2L3 14.6l2 3.4 2.5-.9c.5.4 1.1.7 1.7 1L10 21h4l.8-2.5a7 7 0 001.7-1l2.5.9 2-3.4-2.1-1.6c.1-.3.1-.7.1-1z"/></svg>
+      Settings
+    </a>
+
+    <div class="side-foot">
+      <div class="storage-card" title="Templates and counts only — raw logs are not retained.">
+        <div class="row1">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+          Storage Mode
+        </div>
+        <div class="row2">Template &amp; metrics only</div>
+        <div class="row3">(Raw logs disabled)</div>
+      </div>
+      <div class="user-card">
+        <div class="avatar">AD</div>
+        <div>
+          <div class="name">Admin</div>
+          <div class="role">Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <h1 id="page-title">Anomalies</h1>
+    <div class="meta">
+      <div class="bell" title="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <span class="count" id="bell-count">0</span>
+      </div>
+      <div id="topbar-count">0 anomalies</div>
+      <div id="topbar-time"></div>
+    </div>
+  </header>
+
+  <main class="main" id="main"></main>
+
+  <aside class="rail" id="rail"></aside>
+</div>
 
 <script type="module">
-  const list = document.getElementById('list');
-  const empty = document.getElementById('empty');
-  const meta = document.getElementById('meta');
-  const seen = new Set();
-
-  function el(tag, cls, text) {
+  // -------------- helpers --------------
+  const $ = (s, p=document) => p.querySelector(s);
+  const $$ = (s, p=document) => Array.from(p.querySelectorAll(s));
+  const el = (tag, cls, content) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
+    if (content != null) e.innerHTML = content;
     return e;
+  };
+  const fmtTime = d => new Date(d).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const fmtAgo = d => {
+    const ms = Date.now() - new Date(d).getTime();
+    if (ms < 60_000) return 'a few seconds ago';
+    const m = Math.floor(ms / 60_000);
+    if (m < 60) return m + ' min ago';
+    const h = Math.floor(m / 60);
+    return h + ' hr ago';
+  };
+  const sevColor = s => ({critical:'critical',high:'high',medium:'medium',low:'low'}[s] || 'medium');
+  const sevPretty = s => (s||'medium').toUpperCase();
+  const wlPath = w => `${w.namespace || '?'} / ${w.kind || '?'} / ${w.name || '?'}`;
+  const escapeHTML = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // -------------- API --------------
+  const api = {
+    summary:    () => fetch('/v1/summary').then(r => r.json()),
+    anomalies:  q => fetch('/v1/anomalies?' + new URLSearchParams(q||{})).then(r => r.json()),
+    anomaly:    id => fetch('/v1/anomalies/' + encodeURIComponent(id)).then(r => r.json()),
+    setState:   (id, action) => fetch(`/v1/anomalies/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
+    workloads:  () => fetch('/v1/workloads').then(r => r.json()),
+    services:   () => fetch('/v1/services').then(r => r.json()),
+    deployments:() => fetch('/v1/deployments').then(r => r.json()),
+    events:     () => fetch('/v1/events').then(r => r.json()),
+    incidents:  () => fetch('/v1/incidents').then(r => r.json()),
+    channels:   () => fetch('/v1/channels').then(r => r.json()),
+  };
+
+  // -------------- routing --------------
+  const routes = {
+    overview:    renderOverview,
+    anomalies:   renderAnomalies,
+    workloads:   renderWorkloads,
+    incidents:   renderIncidents,
+    deployments: renderDeployments,
+    services:    renderServices,
+    events:      renderEvents,
+    silences:    renderSilences,
+    channels:    renderChannels,
+    settings:    renderSettings,
+  };
+  const titles = {
+    overview: 'Overview', anomalies: 'Anomalies', workloads: 'Workloads',
+    incidents: 'Incidents', deployments: 'Deployments', services: 'Services',
+    events: 'Events', silences: 'Silences', channels: 'Channels', settings: 'Settings',
+  };
+
+  let activeRoute = 'anomalies';
+  let activeSeverity = ''; // empty = all
+  $$('.nav-item').forEach(n => n.addEventListener('click', e => {
+    e.preventDefault();
+    const r = n.dataset.route;
+    if (r) navigate(r);
+  }));
+
+  function navigate(r) {
+    activeRoute = r;
+    activeSeverity = '';
+    $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.route === r));
+    $('#page-title').textContent = titles[r] || r;
+    rerender();
   }
 
-  function renderCard(a) {
-    const card = el('div', 'card flash sev-' + a.severity);
-    card.dataset.id = a.id;
+  // -------------- main render loop --------------
+  let lastSummary = null;
+  async function tick() {
+    try {
+      const sum = await api.summary();
+      lastSummary = sum;
+      $('#topbar-count').textContent = `${sum.total} anomalies`;
+      $('#topbar-time').textContent = new Date().toLocaleTimeString();
+      $('#nav-anomalies-count').textContent = sum.total;
+      $('#bell-count').textContent = sum.total;
+      $('#bell-count').style.display = sum.total ? 'inline-block' : 'none';
+    } catch(e) {
+      $('#topbar-time').textContent = 'detector unreachable';
+    }
+    rerender();
+  }
+  async function rerender() {
+    try {
+      await routes[activeRoute]();
+    } catch (e) {
+      $('#main').innerHTML = '<div class="empty">Error: ' + escapeHTML(e.message) + '</div>';
+    }
+  }
+  tick();
+  setInterval(tick, 2000);
 
-    const top = el('div', 'top');
-    top.appendChild(el('span', 'kind', a.kind.replace(/_/g, ' ')));
-    top.appendChild(el('span', 'workload', a.workload.namespace + '/' + (a.workload.kind || '') + '/' + a.workload.name));
-    top.appendChild(el('span', 'sev sev-' + a.severity, a.severity));
-    card.appendChild(top);
+  // -------------- Overview --------------
+  async function renderOverview() {
+    const sum = lastSummary || await api.summary();
+    const m = $('#main');
+    m.innerHTML = '';
 
-    if (a.rca) card.appendChild(el('div', 'rca', a.rca));
-    if (a.template) card.appendChild(el('div', 'template', a.template));
-    if (a.rollback_hint) card.appendChild(el('div', 'hint', a.rollback_hint));
+    const top = el('div', 'pcard');
+    const totalLine = el('div', 'total-line');
+    const big = el('div', 'big', sum.total);
+    const lbl = el('div', 'lbl', 'anomalies last 6h');
+    totalLine.append(big, lbl);
+    top.append(el('h3','','Cluster anomaly summary'), totalLine, sevBar(sum.by_severity), sparkline(sum.sparkline));
+    m.append(top);
 
-    const footer = el('div', 'footer');
-    footer.appendChild(el('span', null, 'fired ' + new Date(a.fired_at).toLocaleTimeString()));
-    footer.appendChild(el('span', null, 'pods ' + (a.affected_pods ?? 0)));
-    footer.appendChild(el('span', null, 'id ' + a.id));
-    card.appendChild(footer);
+    if (sum.recommendations && sum.recommendations.length) {
+      const r = el('div', 'pcard');
+      r.append(el('h3','','💡 Recommended actions'));
+      sum.recommendations.forEach(t => r.append(el('div','row','<div class="name">'+escapeHTML(t)+'</div>')));
+      m.append(r);
+    }
+    renderRail(sum);
+  }
+
+  // -------------- Anomalies --------------
+  async function renderAnomalies() {
+    const sum = lastSummary || await api.summary();
+    const data = await api.anomalies({limit: 200, severity: activeSeverity, since: '6h'});
+    const m = $('#main');
+    m.innerHTML = '';
+
+    // Tabs
+    const tabs = el('div','tabs');
+    const allTab = el('div','tab' + (activeSeverity===''?' active':''),
+      `All anomalies <span class="num">${sum.total||0}</span>`);
+    allTab.onclick = () => { activeSeverity=''; rerender(); };
+    tabs.append(allTab);
+    [['critical','crit'],['high','high'],['medium','med'],['low','low']].forEach(([k,c]) => {
+      const t = el('div',`tab ${c}` + (activeSeverity===k?' active':''),
+        `<div class="dot"></div> ${k[0].toUpperCase()+k.slice(1)} <span class="num">${(sum.by_severity||{})[k]||0}</span>`);
+      t.onclick = () => { activeSeverity = (activeSeverity===k?'':k); rerender(); };
+      tabs.append(t);
+    });
+    m.append(tabs);
+
+    // Filters row
+    const fr = el('div','filters-row');
+    fr.innerHTML = `
+      <div class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Last 6 hours</div>
+      <div class="pill primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18l-7 9v6l-4-2v-4z"/></svg>Filters</div>
+    `;
+    m.append(fr);
+
+    // Header row
+    const head = el('div');
+    head.style.cssText = 'display:grid;grid-template-columns:1fr 120px 220px 180px;color:var(--muted);font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:0 18px 8px;';
+    head.innerHTML = `<div>Anomaly</div><div>Severity</div><div>Impact</div><div>First seen</div>`;
+    m.append(head);
+
+    if (!data.anomalies || data.anomalies.length === 0) {
+      m.append(el('div', 'empty', '<div class="pulse-dot"></div>Watching cluster heartbeat — no anomalies yet.'));
+    } else {
+      data.anomalies.forEach(a => m.append(anomalyCard(a)));
+    }
+    renderRail(sum);
+  }
+
+  function anomalyCard(a) {
+    const card = el('div', `a-card sev-${sevColor(a.severity)}`);
+
+    // Top row: tag + workload path + severity
+    const top = el('div','a-top');
+    const tagLabel = a.deployment_correlated ? 'NEW ERROR AFTER DEPLOY'
+      : a.first_seen_in_version ? 'NEW ERROR TEMPLATE'
+      : (a.kind === 'template_rate_spike' ? 'RATE SPIKE'
+      : (a.kind === 'restart_rate' ? 'RESTART SPIKE' : 'NEW ANOMALY'));
+    const tagCls = a.deployment_correlated ? 'a-tag deploy' : 'a-tag';
+    top.append(el('span', tagCls, tagLabel));
+    const path = el('span','a-path', escapeHTML(wlPath(a.workload)));
+    top.append(path);
+    const sev = el('span','a-sev', sevPretty(a.severity));
+    top.append(sev);
+    card.append(top);
+
+    // Headline + first-seen-in-version badge
+    const headline = el('div','a-headline');
+    headline.innerHTML = (a.deployment_correlated ? '🚨 ' : '⚠️ ') + escapeHTML(a.headline || 'New anomaly');
+    if (a.first_seen_in_version) headline.innerHTML += ' <span class="first-seen">First seen in this version</span>';
+    if (a.variants && a.variants.length) headline.innerHTML += ` <span class="first-seen">+${a.variants.length} variants</span>`;
+    card.append(headline);
+
+    // Story
+    if (a.short_story) card.append(el('div','a-story', escapeHTML(a.short_story)));
+
+    // Meta grid: impact + times
+    const meta = el('div','a-meta');
+    const impact = el('div','a-impact');
+    impact.innerHTML = `
+      <div class="row"><span>👥</span><span>${a.affected_pods || 1} pod${(a.affected_pods||1) > 1 ? 's' : ''} affected</span></div>
+      ${a.image_digest ? `<div class="row"><span>🏷️</span><span>${escapeHTML(a.image_digest.slice(0,18))}…</span></div>` : ''}
+      ${a.impact_line ? `<div class="row"><span>📊</span><span>${escapeHTML(a.impact_line)}</span></div>` : ''}
+    `;
+    const times = el('div','a-times', `<div class="ago">${fmtTime(a.fired_at)}</div><div>${fmtAgo(a.fired_at)}</div>`);
+    meta.append(impact, times);
+    card.append(meta);
+
+    // Timeline
+    if (a.timeline && a.timeline.length) {
+      const tl = el('div','a-timeline');
+      a.timeline.forEach((step, i) => {
+        if (i > 0) tl.append(el('span','arrow','→'));
+        const s = el('span','step');
+        s.innerHTML = `<strong>${fmtTime(step.when)}</strong> ${escapeHTML(step.label)}`;
+        tl.append(s);
+      });
+      card.append(tl);
+    }
+
+    // Confidence bar
+    if (a.confidence) {
+      const conf = el('div','a-confidence');
+      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${a.confidence}%"></div></div><strong>${a.confidence}%</strong>`;
+      card.append(conf);
+    }
+
+    // Chips
+    const chips = el('div','a-chips');
+    chips.innerHTML = `
+      <span class="a-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg><code>id: ${escapeHTML(a.id.slice(0,16))}…</code></span>
+    `;
+    if (a.variants && a.variants.length) {
+      const v = el('span','a-chip variants', `+${a.variants.length} similar variants`);
+      chips.append(v);
+    }
+    card.append(chips);
+
+    // Actions
+    const acts = el('div','a-actions');
+    const view = el('button','btn primary','View details');
+    view.onclick = () => showDetails(a.id);
+    const silence = el('button','btn','Silence');
+    silence.onclick = () => doAction(a.id, 'silence');
+    const resolve = el('button','btn','Mark resolved');
+    resolve.onclick = () => doAction(a.id, 'resolve');
+    const ignore = el('button','btn ghost','Ignore');
+    ignore.onclick = () => doAction(a.id, 'ignore');
+    acts.append(view, silence, resolve, ignore);
+    card.append(acts);
+
+    // Suggestions (collapsed by default for the card; full in details modal)
+    if (a.suggestions && a.suggestions.length) {
+      const sug = el('div','a-suggestions');
+      sug.append(el('h4','','Suggested investigation'));
+      a.suggestions.slice(0, 2).forEach(s => {
+        const box = el('div','a-sug');
+        box.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>${s.command?'<code>'+escapeHTML(s.command)+'</code>':''}${s.why?'<div class="why">'+escapeHTML(s.why)+'</div>':''}`;
+        sug.append(box);
+      });
+      if (a.suggestions.length > 2) {
+        sug.append(el('div','why', `+${a.suggestions.length-2} more in details`));
+      }
+      card.append(sug);
+    }
 
     return card;
   }
 
-  async function tick() {
+  async function doAction(id, action) {
     try {
-      const r = await fetch('/v1/anomalies');
-      if (!r.ok) throw new Error(r.status);
-      const data = await r.json();
-      meta.textContent = `${data.count ?? 0} anomalies · ${new Date().toLocaleTimeString()}`;
-      const items = data.anomalies || [];
-      if (items.length > 0 && empty.parentNode) empty.remove();
-
-      // Render newest cards that we haven't seen yet, prepended.
-      for (let i = items.length - 1; i >= 0; i--) {
-        const a = items[i];
-        if (seen.has(a.id)) continue;
-        seen.add(a.id);
-        list.prepend(renderCard(a));
-      }
+      await api.setState(id, action);
+      toast(`${action[0].toUpperCase()+action.slice(1)}d`);
+      tick();
     } catch (e) {
-      meta.textContent = 'detector unreachable';
+      toast('Failed: ' + e.message);
     }
   }
 
-  tick();
-  setInterval(tick, 1500);
+  async function showDetails(id) {
+    try {
+      const a = await api.anomaly(id);
+      const overlay = el('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:grid;place-items:center;padding:30px;';
+      const card = anomalyCard(a);
+      card.style.cssText = 'max-width:760px;width:100%;max-height:80vh;overflow-y:auto;';
+      // Show ALL suggestions in the modal.
+      const sug = card.querySelector('.a-suggestions');
+      if (sug && a.suggestions && a.suggestions.length > 2) {
+        sug.innerHTML = '<h4>Suggested investigation</h4>';
+        a.suggestions.forEach(s => {
+          const box = el('div','a-sug');
+          box.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>${s.command?'<code>'+escapeHTML(s.command)+'</code>':''}${s.why?'<div class="why">'+escapeHTML(s.why)+'</div>':''}`;
+          sug.append(box);
+        });
+      }
+      // Add raw template + sample
+      const detail = el('div', 'a-suggestions');
+      detail.innerHTML = `<h4>Raw template</h4><div class="a-sug"><code>${escapeHTML(a.template||'')}</code></div>`;
+      if (a.sample && a.sample.length) {
+        detail.innerHTML += `<h4 style="margin-top:10px;">Sample line (redacted)</h4><div class="a-sug"><code>${escapeHTML(a.sample[0])}</code></div>`;
+      }
+      card.append(detail);
+      overlay.append(card);
+      overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+      document.body.append(overlay);
+    } catch(e) { toast('Failed: ' + e.message); }
+  }
+
+  // -------------- Workloads --------------
+  async function renderWorkloads() {
+    const m = $('#main');
+    const data = await api.workloads();
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','',`Workloads <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
+    const t = document.createElement('table');
+    t.innerHTML = `<thead><tr><th>Namespace</th><th>Kind</th><th>Name</th><th>Pods</th><th>Anomalies</th><th>Worst</th><th>Image</th><th>Last rollout</th></tr></thead><tbody></tbody>`;
+    const body = t.querySelector('tbody');
+    (data.workloads||[]).forEach(w => {
+      const tr = document.createElement('tr');
+      const sev = w.worst_severity || '';
+      tr.innerHTML = `
+        <td>${escapeHTML(w.workload.namespace)}</td>
+        <td style="color:var(--muted)">${escapeHTML(w.workload.kind||'')}</td>
+        <td><strong>${escapeHTML(w.workload.name)}</strong></td>
+        <td>${w.pods}</td>
+        <td>${w.anomaly_count}</td>
+        <td>${sev?`<span class="sevdot ${sev}"></span>${sev}`:'<span style="color:var(--muted)">—</span>'}</td>
+        <td style="color:var(--muted);font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML((w.image||'').slice(0,40))}${(w.image||'').length>40?'…':''}</td>
+        <td style="color:var(--muted)">${w.last_rollout ? fmtAgo(w.last_rollout) : '—'}</td>
+      `;
+      body.append(tr);
+    });
+    card.append(t);
+    m.append(card);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Incidents --------------
+  async function renderIncidents() {
+    const m = $('#main');
+    const data = await api.incidents();
+    m.innerHTML = '';
+    if (!data.incidents || !data.incidents.length) {
+      m.append(el('div', 'empty', 'No grouped incidents in the current window.'));
+    } else {
+      data.incidents.forEach(i => {
+        const c = el('div','pcard');
+        c.innerHTML = `
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+            <span class="sevdot ${i.worst_severity||'medium'}"></span>
+            <strong>${escapeHTML(i.namespace)}</strong>
+            <span style="color:var(--muted);font-size:12px;">started ${fmtAgo(i.started_at)} · ${i.anomaly_count} anomalies across ${i.workloads.length} workloads</span>
+          </div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:6px;">${escapeHTML(i.workloads.join(', '))}</div>
+          ${(i.headlines||[]).map(h => `<div class="row"><div class="name">${escapeHTML(h)}</div></div>`).join('')}
+        `;
+        m.append(c);
+      });
+    }
+    renderRail(lastSummary);
+  }
+
+  // -------------- Deployments --------------
+  async function renderDeployments() {
+    const m = $('#main');
+    const data = await api.deployments();
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','',`Recent deployments <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
+    if (!data.deployments || !data.deployments.length) {
+      card.append(el('div','empty','No rollouts in the last 7 days.'));
+    } else {
+      data.deployments.forEach(d => {
+        const row = el('div','row');
+        const status = d.issue_detected
+          ? `<span style="color:var(--high)">⚠️ Caused ${d.caused_anomalies} anomalies</span>`
+          : `<span style="color:var(--ok)">✅ No issues detected</span>`;
+        row.innerHTML = `
+          <div>
+            <div class="name"><strong>${escapeHTML(d.workload.name)}</strong> <span style="color:var(--muted);font-size:11.5px;">${escapeHTML(d.workload.namespace)}</span></div>
+            <div class="meta">${fmtTime(d.when)} · ${escapeHTML((d.image||'').slice(0,60))}${d.commit?` · commit ${escapeHTML(d.commit.slice(0,7))}`:''}</div>
+          </div>
+          <div>${status}</div>
+        `;
+        card.append(row);
+      });
+    }
+    m.append(card);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Services --------------
+  async function renderServices() {
+    const m = $('#main');
+    const data = await api.services();
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','',`Services <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
+    const t = document.createElement('table');
+    t.innerHTML = `<thead><tr><th>Namespace</th><th>Name</th><th>Type</th><th>ClusterIP</th><th>Ports</th></tr></thead><tbody></tbody>`;
+    const tb = t.querySelector('tbody');
+    (data.services||[]).forEach(s => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHTML(s.Namespace)}</td><td>${escapeHTML(s.Name)}</td><td style="color:var(--muted)">${escapeHTML(s.Type||'')}</td><td style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML(s.ClusterIP||'')}</td><td style="color:var(--muted);font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML((s.Ports||[]).join(', '))}</td>`;
+      tb.append(tr);
+    });
+    card.append(t);
+    m.append(card);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Events --------------
+  async function renderEvents() {
+    const m = $('#main');
+    const data = await api.events();
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','',`Events <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
+    (data.events||[]).slice(0,200).forEach(e => {
+      const r = el('div','row');
+      r.innerHTML = `<div><div class="name">${escapeHTML(e.subject)}</div><div class="meta">${escapeHTML(e.message||'')}</div></div><div class="meta">${fmtTime(e.time)}</div>`;
+      card.append(r);
+    });
+    m.append(card);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Silences --------------
+  async function renderSilences() {
+    const m = $('#main');
+    const data = await api.anomalies({state: 'silenced', limit: 200});
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','',`Silenced anomalies <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
+    if (!data.anomalies || !data.anomalies.length) {
+      card.append(el('div','empty','No silenced anomalies. Use "Silence" on any active card to mute it.'));
+    } else {
+      data.anomalies.forEach(a => {
+        const r = el('div','row');
+        r.innerHTML = `<div><div class="name">${escapeHTML(a.headline||a.template||'(no title)')}</div><div class="meta">${escapeHTML(wlPath(a.workload))}</div></div><div class="meta">silenced ${fmtAgo(a.updated_at)}</div>`;
+        card.append(r);
+      });
+    }
+    m.append(card);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Channels --------------
+  async function renderChannels() {
+    const m = $('#main');
+    const data = await api.channels();
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','',`Alert channels`));
+    const all = ['slack','teams','smtp','pagerduty','webhook'];
+    const configured = new Set((data.channels||[]).map(c => c.name));
+    all.forEach(name => {
+      const r = el('div','row');
+      const status = configured.has(name)
+        ? `<span style="color:var(--ok)">✅ Configured</span>`
+        : `<span style="color:var(--muted)">Not configured (set --${name}-webhook or env)</span>`;
+      r.innerHTML = `<div class="name">${name[0].toUpperCase()+name.slice(1)}</div>${status}`;
+      card.append(r);
+    });
+    m.append(card);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Settings --------------
+  async function renderSettings() {
+    const m = $('#main');
+    const sum = lastSummary || await api.summary();
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','','Detector settings'));
+    card.innerHTML += `
+      <div class="row"><div class="name">K8s integration</div><div class="meta">${sum.k8s_connected?'✅ Connected (informers active)':'⚠ Not connected'}</div></div>
+      <div class="row"><div class="name">Storage policy</div><div class="meta">${escapeHTML(sum.storage_policy||'')}</div></div>
+      <div class="row"><div class="name">Detector started</div><div class="meta">${sum.started_at ? new Date(sum.started_at).toLocaleString() : '—'}</div></div>
+      <div class="row"><div class="name">Configured channels</div><div class="meta">${(sum.channels||[]).join(', ') || 'none'}</div></div>
+    `;
+    m.append(card);
+    renderRail(sum);
+  }
+
+  // -------------- Right rail --------------
+  function renderRail(sum) {
+    if (!sum) return;
+    const rail = $('#rail');
+    rail.innerHTML = '';
+
+    // Incident summary
+    const inc = el('div','card');
+    inc.innerHTML = `<h3>Incident summary</h3><div class="sub">Since last 6 hours</div>`;
+    const totLine = el('div','total-line');
+    totLine.innerHTML = `<div class="big">${sum.total||0}</div><div class="lbl">total anomalies</div>`;
+    inc.append(totLine);
+    inc.append(sparkline(sum.sparkline));
+    inc.append(sevBar(sum.by_severity));
+    rail.append(inc);
+
+    // Top workloads
+    const tw = el('div','card');
+    tw.innerHTML = `<h3>Top workloads</h3><div class="sub">By affected pods</div>`;
+    if (!sum.top_workloads || !sum.top_workloads.length) {
+      tw.append(el('div','sub','No anomalies in window'));
+    } else {
+      sum.top_workloads.forEach(w => {
+        const r = el('div','row');
+        const max = Math.max(1, ...sum.top_workloads.map(x => x.affected_pods || x.anomaly_count || 1));
+        const pct = Math.max(8, Math.round(100 * (w.affected_pods || w.anomaly_count) / max));
+        r.innerHTML = `<div style="flex:1;min-width:0;"><div class="name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(w.workload.name)}</div><div style="height:4px;background:var(--panel-2);border-radius:2px;margin-top:6px;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px;"></div></div></div><div class="num">${w.affected_pods || w.anomaly_count}</div>`;
+        tw.append(r);
+      });
+    }
+    rail.append(tw);
+
+    // Recent deployments
+    const rd = el('div','card');
+    rd.innerHTML = `<h3>Recent deployments</h3><div class="sub">Last 24 hours</div>`;
+    if (!sum.recent_deployments || !sum.recent_deployments.length) {
+      rd.append(el('div','sub','No rollouts'));
+    } else {
+      sum.recent_deployments.forEach(d => {
+        const r = el('div','row');
+        const tag = d.issue_detected
+          ? `<span style="color:var(--high);font-size:11px;background:rgba(255,138,61,.12);padding:2px 7px;border-radius:4px;">⚠ Caused issues</span>`
+          : `<span style="color:var(--ok);font-size:11px;background:rgba(105,209,153,.10);padding:2px 7px;border-radius:4px;">✓ No issues</span>`;
+        r.innerHTML = `<div style="flex:1;min-width:0;"><div class="name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(d.workload.name)}</div><div class="meta">${fmtTime(d.when)}${d.commit?` · ${escapeHTML(d.commit.slice(0,7))}`:''}</div></div>${tag}`;
+        rd.append(r);
+      });
+    }
+    rail.append(rd);
+
+    // Recommendations
+    if (sum.recommendations && sum.recommendations.length) {
+      const r = el('div','card');
+      r.innerHTML = `<h3>💡 Recommended actions</h3>`;
+      sum.recommendations.forEach((t, i) => r.append(el('div','row',`<div class="name">${i+1}. ${escapeHTML(t)}</div>`)));
+      rail.append(r);
+    }
+  }
+
+  function sevBar(by) {
+    by = by || {};
+    const wrap = el('div','sev-bar');
+    wrap.innerHTML = `
+      <div class="sev-cell crit"><div class="n">${by.critical||0}</div><div class="l">Critical</div></div>
+      <div class="sev-cell high"><div class="n">${by.high||0}</div><div class="l">High</div></div>
+      <div class="sev-cell med"><div class="n">${by.medium||0}</div><div class="l">Medium</div></div>
+      <div class="sev-cell low"><div class="n">${by.low||0}</div><div class="l">Low</div></div>
+    `;
+    return wrap;
+  }
+
+  function sparkline(points) {
+    points = points || [];
+    if (!points.length) return el('div');
+    const max = Math.max(1, ...points.map(p => p.count));
+    const w = 280, h = 50;
+    const stepX = w / (points.length - 1 || 1);
+    const path = points.map((p, i) => {
+      const x = i * stepX;
+      const y = h - (p.count / max) * h;
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    const area = path + ` L${w},${h} L0,${h} Z`;
+    const svg = el('div');
+    svg.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="50" style="margin-top:10px;display:block;"><defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d6d" stop-opacity=".4"/><stop offset="1" stop-color="#ff4d6d" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#sg)" /><path d="${path}" stroke="#ff4d6d" stroke-width="1.5" fill="none"/></svg>`;
+    return svg;
+  }
+
+  // -------------- toast --------------
+  function toast(msg) {
+    const t = el('div','toast', escapeHTML(msg));
+    document.body.append(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 2200);
+  }
 </script>
+
 </body>
 </html>

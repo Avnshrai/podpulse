@@ -30,8 +30,10 @@ func main() {
 	var (
 		httpAddr     = flag.String("http-addr", ":8080", "HTTP listen address (ingest + UI + API)")
 		slackWebhook = flag.String("slack-webhook", os.Getenv("SLACK_WEBHOOK"), "Slack incoming webhook URL")
-		minHistory   = flag.Duration("min-history", 30*time.Second,
+		minHistory = flag.Duration("min-history", 5*time.Minute,
 			"Per-workload warm-up window before new-template alerts can fire")
+		minLines = flag.Int("min-lines", 200,
+			"Minimum lines observed for a workload before any alert fires (cold-start gate)")
 		kubeconfig = flag.String("kubeconfig", os.Getenv("KUBECONFIG"),
 			"Path to kubeconfig (auto-detected when running in-cluster or from ~/.kube/config)")
 		k8sEnabled = flag.Bool("k8s", true,
@@ -44,13 +46,16 @@ func main() {
 	slog.SetDefault(logger)
 
 	templates.MinHistory = *minHistory
+	templates.MinLines = *minLines
 
 	store := anomaly.NewStore(1000)
 	detector := templates.New()
 
 	dispatcher := alert.NewDispatcher()
+	var channels []string
 	if *slackWebhook != "" {
 		dispatcher.Add(slack.New(*slackWebhook))
+		channels = append(channels, "slack")
 		slog.Info("slack channel configured")
 	} else {
 		slog.Info("no alert channels configured (set --slack-webhook or SLACK_WEBHOOK)")
@@ -82,6 +87,7 @@ func main() {
 		Dispatcher: dispatcher,
 		WebFS:      web.FS(),
 		K8sCache:   k8sCache,
+		Channels:   channels,
 	})
 
 	httpSrv := &http.Server{
