@@ -26,28 +26,35 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/usr/local/bin/pp-tailer"]
           args:
-            - --detector=$(DETECTOR_ADDR)
+            - --detector=$(DETECTOR_URL)
+            {{- if not .Values.tailer.demo }}
             - --logs-dir={{ .Values.tailer.logsHostPath }}
+            {{- end }}
+            {{- if .Values.tailer.demo }}
+            - --demo
+            - --demo-break-after={{ .Values.tailer.demoBreakAfter | default "45s" }}
+            {{- end }}
+            {{- range .Values.tailer.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
           env:
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: DETECTOR_ADDR
-              value: "{{ include "podpulse.fullname" . }}-detector.{{ .Release.Namespace }}.svc:{{ .Values.detector.service.grpcPort }}"
+            - name: DETECTOR_URL
+              value: "http://{{ include "podpulse.fullname" . }}-detector.{{ .Release.Namespace }}.svc:{{ .Values.detector.service.httpPort }}"
           resources:
             {{- toYaml .Values.tailer.resources | nindent 12 }}
+          {{- if not .Values.tailer.demo }}
           volumeMounts:
             - name: pod-logs
               mountPath: {{ .Values.tailer.logsHostPath }}
               readOnly: true
-            - name: container-logs
-              mountPath: /var/lib/docker/containers
-              readOnly: true
+          {{- end }}
+      {{- if not .Values.tailer.demo }}
       volumes:
         - name: pod-logs
           hostPath:
             path: {{ .Values.tailer.logsHostPath }}
-        - name: container-logs
-          hostPath:
-            path: /var/lib/docker/containers
+      {{- end }}

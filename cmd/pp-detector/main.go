@@ -2,8 +2,9 @@
 //
 // It accepts log-line batches from pp-tailer DaemonSets over HTTP, runs
 // the detection pipeline (Drain3 templates → new-template-per-image-
-// digest), fills root-cause sentences, dispatches alerts, and serves
-// the CLI/web API.
+// digest), enriches incoming log lines from a K8s informer cache, fills
+// root-cause sentences (with rollout context), dispatches alerts, and
+// serves the CLI/web API.
 package main
 
 import (
@@ -22,6 +23,7 @@ import (
 	"github.com/podpulse/podpulse/internal/api"
 	"github.com/podpulse/podpulse/internal/api/web"
 	"github.com/podpulse/podpulse/internal/detect/templates"
+	ppk8s "github.com/podpulse/podpulse/internal/k8s"
 )
 
 func main() {
@@ -29,7 +31,12 @@ func main() {
 		httpAddr     = flag.String("http-addr", ":8080", "HTTP listen address (ingest + UI + API)")
 		slackWebhook = flag.String("slack-webhook", os.Getenv("SLACK_WEBHOOK"), "Slack incoming webhook URL")
 		minHistory   = flag.Duration("min-history", 30*time.Second,
-			"Per-(workload, image-digest) warm-up window before new-template alerts can fire")
+			"Per-workload warm-up window before new-template alerts can fire")
+		kubeconfig = flag.String("kubeconfig", os.Getenv("KUBECONFIG"),
+			"Path to kubeconfig (auto-detected when running in-cluster or from ~/.kube/config)")
+		k8sEnabled = flag.Bool("k8s", true,
+			"Enable Kubernetes informer integration (set to false to run standalone)")
+		resync = flag.Duration("k8s-resync", 5*time.Minute, "Informer resync period")
 	)
 	flag.Parse()
 
@@ -49,7 +56,33 @@ func main() {
 		slog.Info("no alert channels configured (set --slack-webhook or SLACK_WEBHOOK)")
 	}
 
-	server := api.NewServer(store, detector, dispatcher, web.FS())
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	var k8sCache *ppk8s.Cache
+	if *k8sEnabled {
+		client, err := ppk8s.NewClient(*kubeconfig)
+		if err != nil {
+			slog.Warn("kubernetes integration disabled — could not load config",
+				"err", err)
+		} else {
+			k8sCache = ppk8s.NewCache(logger)
+			go func() {
+				if err := k8sCache.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
+					slog.Error("informer loop exited", "err", err)
+				}
+			}()
+			slog.Info("kubernetes integration enabled")
+		}
+	}
+
+	server := api.NewServer(api.Options{
+		Store:      store,
+		Detector:   detector,
+		Dispatcher: dispatcher,
+		WebFS:      web.FS(),
+		K8sCache:   k8sCache,
+	})
 
 	httpSrv := &http.Server{
 		Addr:              *httpAddr,
@@ -57,11 +90,12 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
 	go func() {
-		slog.Info("pp-detector listening", "http", *httpAddr, "min_history", minHistory.String())
+		slog.Info("pp-detector listening",
+			"http", *httpAddr,
+			"min_history", minHistory.String(),
+			"k8s", k8sCache != nil,
+		)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("http server stopped", "err", err)
 			cancel()

@@ -29,6 +29,12 @@ tailer:
       memory: 256Mi
   # Path on the node where the kubelet writes pod logs in CRI format.
   logsHostPath: /var/log/pods
+  # When true, the tailer skips real CRI log reading and instead emits
+  # a synthetic stable-baseline + bad-rollout pattern so you can see
+  # the detector fire end-to-end without instrumenting any workload.
+  demo: false
+  demoBreakAfter: "45s"
+  extraArgs: []
 
 postgres:
   # External Postgres connection string. Required.
