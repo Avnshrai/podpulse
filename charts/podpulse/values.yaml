@@ -1,0 +1,84 @@
+# Default values for PodPulse.
+
+image:
+  registry: ghcr.io
+  repository: podpulse/podpulse
+  tag: ""              # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+detector:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  service:
+    grpcPort: 9090
+    httpPort: 8080
+
+tailer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  # Path on the node where the kubelet writes pod logs in CRI format.
+  logsHostPath: /var/log/pods
+
+postgres:
+  # External Postgres connection string. Required.
+  # Example: postgres://podpulse:secret@postgres:5432/podpulse?sslmode=disable
+  dsn: ""
+
+clickhouse:
+  # External ClickHouse DSN. Required.
+  # Example: clickhouse://default:@clickhouse:9000/podpulse
+  dsn: ""
+
+alerts:
+  slack:
+    webhook: ""        # Slack incoming webhook URL
+  teams:
+    webhook: ""        # MS Teams Power Automate Workflow webhook
+  smtp:
+    host: ""
+    port: 587
+    username: ""
+    password: ""
+    from: ""
+  pagerduty:
+    routingKey: ""
+
+# Templates-only by default. Set to true to additionally store a short
+# rolling buffer of raw log lines for currently-anomalous templates.
+storeRawAnomalousLogs: false
+
+# Optional local LLM for richer RCA phrasing. Off by default; nothing
+# leaves the cluster unless explicitly configured.
+llm:
+  enabled: false
+  endpoint: ""         # e.g. http://ollama.podpulse.svc:11434/v1
+  model: "llama3"
+
+# Read ArgoCD / Flux CRDs to enrich RCA with GitOps context. Requires the
+# CRDs to exist; the chart adds RBAC for them only if enabled.
+gitops:
+  argocd: false
+  flux: false
+
+# GitHub Actions correlation. Optional; needs a PAT with workflow:read.
+githubActions:
+  enabled: false
+  tokenSecretName: ""
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: ""

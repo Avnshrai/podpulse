@@ -1,0 +1,21 @@
+# Binaries
+/bin/
+/dist/
+*.test
+*.out
+
+# Go
+/vendor/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Local env
+.env
+*.local

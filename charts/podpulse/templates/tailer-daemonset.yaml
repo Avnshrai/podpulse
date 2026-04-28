@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "podpulse.fullname" . }}-tailer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podpulse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tailer
+spec:
+  selector:
+    matchLabels:
+      {{- include "podpulse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: tailer
+  template:
+    metadata:
+      labels:
+        {{- include "podpulse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: tailer
+    spec:
+      serviceAccountName: {{ include "podpulse.serviceAccountName" . }}
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: tailer
+          image: {{ include "podpulse.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/pp-tailer"]
+          args:
+            - --detector=$(DETECTOR_ADDR)
+            - --logs-dir={{ .Values.tailer.logsHostPath }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DETECTOR_ADDR
+              value: "{{ include "podpulse.fullname" . }}-detector.{{ .Release.Namespace }}.svc:{{ .Values.detector.service.grpcPort }}"
+          resources:
+            {{- toYaml .Values.tailer.resources | nindent 12 }}
+          volumeMounts:
+            - name: pod-logs
+              mountPath: {{ .Values.tailer.logsHostPath }}
+              readOnly: true
+            - name: container-logs
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+      volumes:
+        - name: pod-logs
+          hostPath:
+            path: {{ .Values.tailer.logsHostPath }}
+        - name: container-logs
+          hostPath:
+            path: /var/lib/docker/containers

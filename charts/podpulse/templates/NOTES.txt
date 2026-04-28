@@ -1,0 +1,13 @@
+PodPulse {{ .Chart.AppVersion }} installed in namespace {{ .Release.Namespace }}.
+
+To check status:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+To port-forward the detector UI:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "podpulse.fullname" . }}-detector 8080:{{ .Values.detector.service.httpPort }}
+  open http://localhost:8080
+
+CLI:
+  podpulse --server http://localhost:8080 anomalies
+
+Docs: https://github.com/podpulse/podpulse

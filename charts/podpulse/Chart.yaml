@@ -1,0 +1,17 @@
+apiVersion: v2
+name: podpulse
+description: Open-source Kubernetes incident detector for logs + events. Zero instrumentation.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kubernetes
+  - observability
+  - incident-detection
+  - log-anomaly
+  - sre
+home: https://github.com/podpulse/podpulse
+sources:
+  - https://github.com/podpulse/podpulse
+maintainers:
+  - name: PodPulse Authors
