@@ -20,6 +20,13 @@ spec:
       serviceAccountName: {{ include "podpulse.serviceAccountName" . }}
       tolerations:
         - operator: Exists
+      {{- if not .Values.tailer.demo }}
+      securityContext:
+        # /var/log/pods is root:root mode 0750 on AKS/containerd nodes,
+        # so the tailer must run as root to traverse it.
+        runAsUser: 0
+        runAsGroup: 0
+      {{- end }}
       containers:
         - name: tailer
           image: {{ include "podpulse.image" . }}

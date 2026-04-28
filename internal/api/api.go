@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/podpulse/podpulse/internal/alert"
@@ -152,8 +153,14 @@ func (s *Server) enrich(line *types.LogLine) {
 	}
 }
 
-func (s *Server) handleListAnomalies(w http.ResponseWriter, _ *http.Request) {
-	out := s.store.List(100)
+func (s *Server) handleListAnomalies(w http.ResponseWriter, r *http.Request) {
+	limit := 100
+	if q := r.URL.Query().Get("limit"); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
+	out := s.store.List(limit)
 	writeJSON(w, map[string]any{"anomalies": out, "count": len(out)})
 }
 
