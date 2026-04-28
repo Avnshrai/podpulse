@@ -987,7 +987,6 @@
     // Meta grid: impact + times
     const meta = el('div','a-meta');
     const impact = el('div','a-impact');
-    const sev = sevColor(a.severity);
     const blast = blastRadius(a.affected_pods || 1, a.severity);
     const blastWrap = el('div','row');
     blastWrap.append(blast);

@@ -93,7 +93,15 @@ func (s *Server) Routes() http.Handler {
 		_, _ = io.WriteString(w, "ok\n")
 	})
 	if s.webFS != nil {
-		mux.Handle("GET /", http.FileServer(http.FS(s.webFS)))
+		// no-cache the SPA so browsers don't pin old HTML/JS after a
+		// detector image upgrade.
+		fs := http.FileServer(http.FS(s.webFS))
+		mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+			fs.ServeHTTP(w, r)
+		}))
 	}
 	return mux
 }
