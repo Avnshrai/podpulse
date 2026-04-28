@@ -497,16 +497,30 @@ func (s *Server) handleListIncidents(w http.ResponseWriter, _ *http.Request) {
 // --- Summary (top of dashboard) ---
 
 type summary struct {
-	Total            int            `json:"total"`
-	BySeverity       map[string]int `json:"by_severity"`
-	TopWorkloads     []topWL        `json:"top_workloads"`
-	RecentDeploys    []deploymentView `json:"recent_deployments"`
-	Sparkline        []sparkPoint   `json:"sparkline"` // last 6h, binned
-	K8sConnected     bool           `json:"k8s_connected"`
-	Channels         []string       `json:"channels"`
-	StoragePolicy    string         `json:"storage_policy"`
-	StartedAt        time.Time      `json:"started_at"`
-	Recommendations  []string       `json:"recommendations"`
+	Total           int              `json:"total"`
+	ActiveCount     int              `json:"active_count"`     // not silenced/resolved/ignored
+	HighRiskCount   int              `json:"high_risk_count"`  // critical+high severity, active
+	LowCount        int              `json:"low_count"`        // low severity, active (collapse target)
+	BySeverity      map[string]int   `json:"by_severity"`
+	TopWorkloads    []topWL          `json:"top_workloads"`
+	RecentDeploys   []deploymentView `json:"recent_deployments"`
+	Sparkline       []sparkPoint     `json:"sparkline"`
+	K8sConnected    bool             `json:"k8s_connected"`
+	Channels        []string         `json:"channels"`
+	StoragePolicy   string           `json:"storage_policy"`
+	StartedAt       time.Time        `json:"started_at"`
+	PrimaryIncident *anomaly.Stored  `json:"primary_incident,omitempty"`
+	Recommendations []recommendation `json:"recommendations"`
+}
+
+// recommendation is one decision-shaped suggestion shown on the Overview.
+type recommendation struct {
+	Title       string `json:"title"`        // e.g. "Rollback orbiter-auth"
+	Reason      string `json:"reason"`       // why we're suggesting this
+	Confidence  int    `json:"confidence"`   // 0-100
+	AnomalyID   string `json:"anomaly_id,omitempty"`
+	WorkloadName string `json:"workload_name,omitempty"`
+	Command     string `json:"command,omitempty"` // shell command to execute / copy
 }
 
 type topWL struct {
@@ -532,12 +546,41 @@ func (s *Server) handleSummary(w http.ResponseWriter, _ *http.Request) {
 		K8sConnected:  s.k8sCache != nil,
 	}
 	wlAgg := map[types.Workload]*topWL{}
+	var primary *anomaly.Stored
+	primaryRank := -1
 	for _, a := range all {
 		if a.FiredAt.Before(since) {
 			continue
 		}
 		sum.Total++
 		sum.BySeverity[string(a.Severity)]++
+		if a.State == anomaly.StateActive {
+			sum.ActiveCount++
+			switch a.Severity {
+			case types.SeverityCritical, types.SeverityHigh:
+				sum.HighRiskCount++
+			case types.SeverityLow:
+				sum.LowCount++
+			}
+			// Pick the primary incident: highest rank by severity +
+			// deployment-correlation + recency.
+			r := severityRank(a.Severity) * 100
+			if a.DeploymentCorrelated {
+				r += 50
+			}
+			if a.Confidence > 80 {
+				r += 20
+			}
+			ageMins := time.Since(a.FiredAt).Minutes()
+			if ageMins < 10 {
+				r += 10 - int(ageMins)
+			}
+			if r > primaryRank {
+				primaryRank = r
+				primary = a
+			}
+		}
+
 		v, ok := wlAgg[a.Workload]
 		if !ok {
 			v = &topWL{Workload: a.Workload}
@@ -548,6 +591,7 @@ func (s *Server) handleSummary(w http.ResponseWriter, _ *http.Request) {
 			v.AffectedPods = a.AffectedPods
 		}
 	}
+	sum.PrimaryIncident = primary
 	for _, v := range wlAgg {
 		sum.TopWorkloads = append(sum.TopWorkloads, *v)
 	}
@@ -610,22 +654,40 @@ func (s *Server) handleSummary(w http.ResponseWriter, _ *http.Request) {
 		sum.RecentDeploys = recent
 	}
 
-	// Recommendations.
-	if sum.Total > 0 {
-		// Find the top noisy workload.
-		if len(sum.TopWorkloads) > 0 {
-			t := sum.TopWorkloads[0]
-			sum.Recommendations = append(sum.Recommendations,
-				"Investigate new errors in "+t.Workload.Name)
-		}
-		// If any deployment caused anomalies, recommend rollback.
-		for _, d := range sum.RecentDeploys {
-			if d.IssueDetected {
-				sum.Recommendations = append(sum.Recommendations,
-					"Consider rollback for "+d.Workload.Name)
-				break
+	// Smart, decision-shaped recommendations: deployment-caused issues
+	// outrank everything, then high-risk workloads, then noise.
+	for _, d := range sum.RecentDeploys {
+		if d.IssueDetected && d.WorstSeverity != types.SeverityLow {
+			ttd := ""
+			// Find the matching primary anomaly to get TTD.
+			for _, a := range all {
+				if a.Workload == d.Workload && a.DeploymentCorrelated && a.TimeToDetectionSeconds > 0 {
+					ttd = humanizeSeconds(a.TimeToDetectionSeconds)
+					break
+				}
 			}
+			reason := "New errors started immediately after deployment"
+			if ttd != "" {
+				reason = "Errors detected " + ttd + " after rollout"
+			}
+			sum.Recommendations = append(sum.Recommendations, recommendation{
+				Title:        "Rollback " + d.Workload.Name,
+				Reason:       reason,
+				Confidence:   confidenceForDeploy(d, all),
+				WorkloadName: d.Workload.Name,
+				Command:      "kubectl rollout undo " + strings.ToLower(string(d.Workload.Kind)) + "/" + d.Workload.Name + " -n " + d.Workload.Namespace,
+			})
 		}
+	}
+	if primary != nil && len(sum.Recommendations) == 0 {
+		sum.Recommendations = append(sum.Recommendations, recommendation{
+			Title:        "Investigate " + primary.Workload.Name,
+			Reason:       primary.Headline,
+			Confidence:   primary.Confidence,
+			AnomalyID:    primary.ID,
+			WorkloadName: primary.Workload.Name,
+			Command:      "kubectl logs -n " + primary.Workload.Namespace + " " + strings.ToLower(string(primary.Workload.Kind)) + "/" + primary.Workload.Name + " --tail=100",
+		})
 	}
 
 	writeJSON(w, sum)
@@ -680,3 +742,22 @@ func contains(xs []string, s string) bool {
 
 // strings used in this file (suppress unused-import warning if pruning later).
 var _ = strings.HasPrefix
+
+func humanizeSeconds(s int) string {
+	if s < 60 {
+		return strconv.Itoa(s) + "s"
+	}
+	if s < 3600 {
+		return strconv.Itoa(s/60) + "m"
+	}
+	return strconv.Itoa(s/3600) + "h"
+}
+
+func confidenceForDeploy(d deploymentView, all []*anomaly.Stored) int {
+	for _, a := range all {
+		if a.Workload == d.Workload && a.DeploymentCorrelated && a.Confidence > 0 {
+			return a.Confidence
+		}
+	}
+	return 70
+}

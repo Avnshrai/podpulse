@@ -33,6 +33,12 @@ type Rollout struct {
 func Fill(a *types.Anomaly, recent Rollout) {
 	deploymentRecent := !recent.When.IsZero() && time.Since(recent.When) < 30*time.Minute
 	a.DeploymentCorrelated = deploymentRecent
+	if deploymentRecent {
+		ttd := int(a.FiredAt.Sub(recent.When).Seconds())
+		if ttd > 0 {
+			a.TimeToDetectionSeconds = ttd
+		}
+	}
 
 	a.Impact, a.ImpactLine = impactFor(*a)
 	a.Headline = headline(*a, recent, deploymentRecent)

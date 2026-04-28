@@ -322,6 +322,114 @@
   .empty { padding: 60px 0; text-align: center; color: var(--muted); }
   .empty .pulse-dot { display: block; width: 32px; height: 32px; margin: 0 auto 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(76,194,255,.55); animation: pulse 1.6s ease-out infinite; }
 
+  /* --- Overview page --- */
+  .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .hero {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, rgba(255,77,109,.12), rgba(108,92,231,.10));
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--high);
+    border-radius: 14px;
+    padding: 22px 24px;
+  }
+  .hero.crit { border-left-color: var(--critical); }
+  .hero.med  { border-left-color: var(--medium); }
+  .hero.low  { border-left-color: var(--low); }
+  .hero.calm { border-left-color: var(--ok); background: linear-gradient(135deg, rgba(105,209,153,.06), rgba(76,194,255,.04)); }
+  .hero h2 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+  .hero .lede { color: var(--muted); margin-bottom: 14px; }
+  .hero .row1 { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; }
+  .hero .meta-line { color: var(--muted); font-size: 13px; }
+  .hero .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+  .stat-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin: 12px 0 6px;
+  }
+  .stat-cell {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-cell .n { font-size: 28px; font-weight: 700; }
+  .stat-cell .l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stat-cell.crit .n { color: var(--critical); }
+  .stat-cell.high .n { color: var(--high); }
+  .stat-cell.warn .n { color: var(--medium); }
+  .stat-cell.ok   .n { color: var(--ok); }
+
+  .deploy-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .deploy-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .deploy-row:last-child { border-bottom: 0; }
+  .deploy-row .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    flex: 0 0 auto;
+  }
+  .deploy-row .dot.bad { background: var(--high); box-shadow: 0 0 8px rgba(255,138,61,.6); }
+  .deploy-row .dot.ok  { background: var(--ok); }
+  .deploy-row .body { flex: 1; min-width: 0; }
+  .deploy-row .name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .deploy-row .sub { font-size: 11.5px; color: var(--muted); }
+  .deploy-row .badge { font-size: 11px; padding: 3px 9px; border-radius: 12px; flex: 0 0 auto; }
+  .deploy-row .badge.bad { background: rgba(255,138,61,.14); color: var(--high); }
+  .deploy-row .badge.ok  { background: rgba(105,209,153,.12); color: var(--ok); }
+
+  .rec-card {
+    background: linear-gradient(135deg, rgba(76,194,255,.08), rgba(108,92,231,.06));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .rec-card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .rec-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .rec-reason { color: var(--muted); margin-bottom: 10px; font-size: 13px; }
+
+  /* Blast-radius dots */
+  .blast { display: inline-flex; gap: 4px; align-items: center; }
+  .blast .b { width: 8px; height: 8px; border-radius: 50%; background: var(--panel-3); }
+  .blast .b.on { background: var(--high); }
+  .blast.crit .b.on { background: var(--critical); }
+  .blast.med  .b.on { background: var(--medium); }
+  .blast.low  .b.on { background: var(--low); }
+
+  /* Collapsed-low banner */
+  .low-fold {
+    background: var(--panel-2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .low-fold:hover { background: var(--panel-3); }
+
+  /* Modal (rollback command) */
+  .modal-shade { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 60; display: grid; place-items: center; padding: 30px; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    max-width: 640px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .modal h3 { margin: 0 0 8px; }
+  .modal .cmd { background: #0a0c11; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--ok); margin: 12px 0; word-break: break-all; }
+  .modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
   /* Tables */
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
@@ -480,8 +588,9 @@
     events: 'Events', silences: 'Silences', channels: 'Channels', settings: 'Settings',
   };
 
-  let activeRoute = 'anomalies';
+  let activeRoute = 'overview';
   let activeSeverity = ''; // empty = all
+  let showLow = false;     // collapse low-severity in the anomalies list by default
   $$('.nav-item').forEach(n => n.addEventListener('click', e => {
     e.preventDefault();
     const r = n.dataset.route;
@@ -491,13 +600,31 @@
   function navigate(r) {
     activeRoute = r;
     activeSeverity = '';
+    lastRenderSig = null;       // force a fresh render on route change
     $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.route === r));
     $('#page-title').textContent = titles[r] || r;
-    rerender();
+    rerender(true);
   }
 
-  // -------------- main render loop --------------
+  // -------------- polling + render gating --------------
+  // We poll the summary every 5s (slow, just to update topbar counts +
+  // detect new anomalies) and only re-render the heavy page content
+  // when the data signature actually changes. Relative timestamps in
+  // existing cards are refreshed in place every 30s.
   let lastSummary = null;
+  let lastRenderSig = null;
+
+  function summarySig(sum) {
+    if (!sum) return 'null';
+    const sev = sum.by_severity || {};
+    return [
+      sum.total,
+      sev.critical, sev.high, sev.medium, sev.low,
+      (sum.top_workloads||[]).map(w => w.workload.name + ':' + w.anomaly_count).join('|'),
+      (sum.recent_deployments||[]).map(d => d.workload.name + ':' + d.caused_anomalies).join('|'),
+    ].join('#');
+  }
+
   async function tick() {
     try {
       const sum = await api.summary();
@@ -509,40 +636,264 @@
       $('#bell-count').style.display = sum.total ? 'inline-block' : 'none';
     } catch(e) {
       $('#topbar-time').textContent = 'detector unreachable';
+      return;
     }
-    rerender();
+    // Only redraw if the meaningful state changed.
+    const sig = activeRoute + '|' + activeSeverity + '|' + summarySig(lastSummary);
+    if (sig !== lastRenderSig) {
+      lastRenderSig = sig;
+      rerender(false);
+    }
   }
-  async function rerender() {
+  async function rerender(force) {
     try {
       await routes[activeRoute]();
     } catch (e) {
       $('#main').innerHTML = '<div class="empty">Error: ' + escapeHTML(e.message) + '</div>';
     }
   }
-  tick();
-  setInterval(tick, 2000);
 
-  // -------------- Overview --------------
+  // Refresh "X min ago" timestamps in place without redrawing cards.
+  function refreshRelativeTimes() {
+    $$('[data-fired]').forEach(node => {
+      node.textContent = fmtAgo(node.dataset.fired);
+    });
+  }
+
+  tick();
+  setInterval(tick, 5000);
+  setInterval(refreshRelativeTimes, 30000);
+
+  // -------------- Overview (hero incident + deployment impact + smart rec) --------------
   async function renderOverview() {
     const sum = lastSummary || await api.summary();
     const m = $('#main');
     m.innerHTML = '';
 
-    const top = el('div', 'pcard');
-    const totalLine = el('div', 'total-line');
-    const big = el('div', 'big', sum.total);
-    const lbl = el('div', 'lbl', 'anomalies last 6h');
-    totalLine.append(big, lbl);
-    top.append(el('h3','','Cluster anomaly summary'), totalLine, sevBar(sum.by_severity), sparkline(sum.sparkline));
-    m.append(top);
+    // 1. HERO: top-of-page status. Either "1 active incident" or "Healthy".
+    m.append(heroStatus(sum));
 
+    // 2. Stat row: actionable counts.
+    m.append(statRow(sum));
+
+    // 3. Two-col grid: Primary incident card + Deployment impact panel.
+    const grid = el('div','ov-grid');
+    grid.append(primaryIncidentCard(sum), deploymentImpactCard(sum));
+    m.append(grid);
+
+    // 4. Smart recommendation card.
     if (sum.recommendations && sum.recommendations.length) {
-      const r = el('div', 'pcard');
-      r.append(el('h3','','💡 Recommended actions'));
-      sum.recommendations.forEach(t => r.append(el('div','row','<div class="name">'+escapeHTML(t)+'</div>')));
-      m.append(r);
+      m.append(recommendationCard(sum.recommendations[0]));
     }
+
+    // 5. Trends sparkline.
+    const trend = el('div','pcard');
+    trend.append(el('h3','','📊 Anomaly trend (last 6 hours)'));
+    trend.append(sparkline(sum.sparkline));
+    m.append(trend);
+
     renderRail(sum);
+  }
+
+  function heroStatus(sum) {
+    const high = sum.high_risk_count || 0;
+    const active = sum.active_count || 0;
+    const primary = sum.primary_incident;
+
+    let cls = 'hero calm';
+    let h2 = '✅ All clear';
+    let lede = `No active incidents in the last 6 hours.`;
+    if (primary) {
+      const sev = primary.severity || 'medium';
+      cls = 'hero ' + (sev === 'critical' ? 'crit' : sev === 'medium' ? 'med' : sev === 'low' ? 'low' : '');
+      const incCount = high > 0 ? high : 1;
+      h2 = `🚨 ${incCount} active ${incCount === 1 ? 'incident' : 'incidents'} need attention`;
+      lede = `${active} active anomalies · ${high} high-risk · ${sum.low_count || 0} low-impact (collapsed)`;
+    } else if (sum.total > 0) {
+      cls = 'hero low';
+      h2 = `⚠ ${sum.total} anomalies — none critical`;
+      lede = `Most are low-impact. Review the list when you have time.`;
+    }
+    const hero = el('div', cls);
+    hero.append(el('h2','', h2), el('div','lede', escapeHTML(lede)));
+    return hero;
+  }
+
+  function statRow(sum) {
+    const row = el('div','stat-row');
+    const high = sum.high_risk_count || 0;
+    const cells = [
+      ['crit', high, `High-risk ${high === 1 ? 'issue' : 'issues'}`],
+      ['warn', (sum.recent_deployments||[]).filter(d => d.issue_detected).length, 'Deployments with issues'],
+      ['ok', (sum.recent_deployments||[]).filter(d => !d.issue_detected).length, 'Healthy deployments'],
+    ];
+    cells.forEach(([cls,n,l]) => {
+      const c = el('div', `stat-cell ${cls}`);
+      c.innerHTML = `<div class="n">${n}</div><div class="l">${l}</div>`;
+      row.append(c);
+    });
+    return row;
+  }
+
+  function primaryIncidentCard(sum) {
+    const card = el('div','pcard');
+    card.style.borderLeft = '4px solid var(--high)';
+    const p = sum.primary_incident;
+    if (!p) {
+      card.append(el('h3','','🚨 Primary incident'));
+      card.append(el('div','empty','No active incident — cluster looks calm.'));
+      return card;
+    }
+    const sev = p.severity || 'medium';
+    card.style.borderLeftColor = `var(--${sev})`;
+    card.append(el('h3','','🚨 Primary incident'));
+
+    const head = el('div');
+    head.style.cssText = 'font-size:18px;font-weight:600;margin-bottom:6px';
+    head.innerHTML = (p.deployment_correlated ? '🚀 ' : '⚠️ ') + escapeHTML(p.headline || 'Anomaly');
+    card.append(head);
+
+    const path = el('div');
+    path.style.cssText = 'font-family:ui-monospace,monospace;color:var(--muted);font-size:12.5px;margin-bottom:10px';
+    path.textContent = wlPath(p.workload);
+    card.append(path);
+
+    if (p.short_story) {
+      const s = el('div'); s.textContent = p.short_story; s.style.marginBottom='10px';
+      card.append(s);
+    }
+
+    // mini-stats
+    const stats = el('div');
+    stats.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin-bottom:10px';
+    const blast = blastRadius(p.affected_pods, sev);
+    stats.append(blast);
+    if (p.impact_line) stats.append(el('span','',escapeHTML(p.impact_line)));
+    if (p.time_to_detection_seconds) stats.append(el('span','',`Detected ${humSecs(p.time_to_detection_seconds)} after rollout`));
+    card.append(stats);
+
+    // confidence
+    if (p.confidence) {
+      const conf = el('div','a-confidence');
+      conf.style.marginTop = '0';
+      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${p.confidence}%"></div></div><strong>${p.confidence}%</strong>`;
+      card.append(conf);
+    }
+
+    // actions
+    const acts = el('div');
+    acts.style.cssText = 'display:flex;gap:8px;margin-top:14px';
+    const view = el('button','btn primary','View details');
+    view.onclick = () => showDetails(p.id);
+    acts.append(view);
+    if (p.deployment_correlated) {
+      const rb = el('button','btn','Rollback');
+      rb.onclick = () => showRollbackModal(p);
+      acts.append(rb);
+    }
+    const ack = el('button','btn ghost','Mark resolved');
+    ack.onclick = () => doAction(p.id, 'resolve');
+    acts.append(ack);
+    card.append(acts);
+    return card;
+  }
+
+  function deploymentImpactCard(sum) {
+    const card = el('div','deploy-card');
+    card.append(el('h3','','🚀 Deployment impact'));
+    card.append(el('div','sub','Last 24 hours · did this deploy break something?'));
+    const list = sum.recent_deployments || [];
+    if (!list.length) {
+      card.append(el('div','empty','No rollouts.'));
+      return card;
+    }
+    list.slice(0, 6).forEach(d => {
+      const row = el('div','deploy-row');
+      const bad = d.issue_detected;
+      const dot = el('div', `dot ${bad?'bad':'ok'}`);
+      const body = el('div','body');
+      body.innerHTML = `<div class="name">${escapeHTML(d.workload.name)}</div><div class="sub">${fmtTime(d.when)}${d.commit?` · ${escapeHTML(d.commit.slice(0,7))}`:''} · ${escapeHTML(d.workload.namespace)}</div>`;
+      const badge = el('div', `badge ${bad?'bad':'ok'}`,
+        bad ? `❌ Caused ${d.caused_anomalies} ${d.caused_anomalies===1?'anomaly':'anomalies'}` : '✅ Healthy');
+      row.append(dot, body, badge);
+      card.append(row);
+    });
+    return card;
+  }
+
+  function recommendationCard(rec) {
+    const card = el('div','rec-card');
+    card.append(el('h3','','💡 Recommended action'));
+    card.append(el('div','rec-title', escapeHTML(rec.title || 'Investigate')));
+    card.append(el('div','rec-reason', escapeHTML(rec.reason || '')));
+    if (rec.confidence) {
+      const conf = el('div','a-confidence');
+      conf.style.marginTop = '0';
+      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${rec.confidence}%"></div></div><strong>${rec.confidence}%</strong>`;
+      card.append(conf);
+    }
+    if (rec.command) {
+      const acts = el('div');
+      acts.style.cssText = 'display:flex;gap:8px;margin-top:14px';
+      const run = el('button','btn primary','Show command');
+      run.onclick = () => showCommandModal(rec.title, rec.command);
+      acts.append(run);
+      if (rec.anomaly_id) {
+        const view = el('button','btn','View incident');
+        view.onclick = () => showDetails(rec.anomaly_id);
+        acts.append(view);
+      }
+      card.append(acts);
+    }
+    return card;
+  }
+
+  function blastRadius(podCount, sev) {
+    podCount = podCount || 1;
+    const wrap = el('span', `blast ${sev==='critical'?'crit':sev==='medium'?'med':sev==='low'?'low':''}`);
+    const total = 4;
+    const lit = Math.min(total, Math.max(1, Math.ceil(podCount / 2)));
+    for (let i = 0; i < total; i++) {
+      const d = el('span', i < lit ? 'b on' : 'b');
+      wrap.append(d);
+    }
+    const lbl = el('span', '', podCount === 1 ? '1 pod' : `${podCount} pods`);
+    lbl.style.cssText = 'margin-left:6px;color:var(--muted)';
+    wrap.append(lbl);
+    return wrap;
+  }
+
+  function humSecs(s) {
+    if (s < 60) return s + ' sec';
+    if (s < 3600) return Math.round(s/60) + ' min';
+    return Math.round(s/3600) + ' hr';
+  }
+
+  function showCommandModal(title, cmd) {
+    const shade = el('div','modal-shade');
+    const m = el('div','modal');
+    m.innerHTML = `
+      <h3>${escapeHTML(title)}</h3>
+      <div class="rec-reason">Copy this command and run it from your shell with kubectl access. PodPulse never executes infrastructure commands automatically.</div>
+      <div class="cmd">${escapeHTML(cmd)}</div>
+      <div class="actions">
+        <button class="btn" id="cm-copy">Copy</button>
+        <button class="btn ghost" id="cm-close">Close</button>
+      </div>`;
+    shade.append(m);
+    shade.onclick = e => { if (e.target === shade) shade.remove(); };
+    document.body.append(shade);
+    m.querySelector('#cm-copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(cmd); toast('Copied'); }
+      catch(_) { toast('Copy failed — select manually'); }
+    };
+    m.querySelector('#cm-close').onclick = () => shade.remove();
+  }
+
+  function showRollbackModal(a) {
+    const wl = a.workload;
+    const cmd = `kubectl rollout undo ${(wl.kind||'deployment').toLowerCase()}/${wl.name} -n ${wl.namespace}`;
+    showCommandModal(`Rollback ${wl.name}`, cmd);
   }
 
   // -------------- Anomalies --------------
@@ -583,7 +934,25 @@
     if (!data.anomalies || data.anomalies.length === 0) {
       m.append(el('div', 'empty', '<div class="pulse-dot"></div>Watching cluster heartbeat — no anomalies yet.'));
     } else {
-      data.anomalies.forEach(a => m.append(anomalyCard(a)));
+      // Collapse low-severity unless the user expanded or filtered to "low".
+      const items = data.anomalies;
+      const high = items.filter(a => a.severity !== 'low');
+      const low  = items.filter(a => a.severity === 'low');
+      const showingLow = (activeSeverity === 'low') || showLow;
+
+      if (high.length === 0 && low.length > 0 && !showingLow) {
+        m.append(el('div','empty','No high-impact anomalies — only low-severity items, hidden by default.'));
+      }
+      high.forEach(a => m.append(anomalyCard(a)));
+
+      if (!showingLow && low.length > 0) {
+        const fold = el('div','low-fold',
+          `${low.length} low-impact ${low.length === 1 ? 'anomaly' : 'anomalies'} hidden — click to expand`);
+        fold.onclick = () => { showLow = true; lastRenderSig = null; rerender(true); };
+        m.append(fold);
+      } else {
+        low.forEach(a => m.append(anomalyCard(a)));
+      }
     }
     renderRail(sum);
   }
@@ -618,12 +987,25 @@
     // Meta grid: impact + times
     const meta = el('div','a-meta');
     const impact = el('div','a-impact');
-    impact.innerHTML = `
-      <div class="row"><span>👥</span><span>${a.affected_pods || 1} pod${(a.affected_pods||1) > 1 ? 's' : ''} affected</span></div>
-      ${a.image_digest ? `<div class="row"><span>🏷️</span><span>${escapeHTML(a.image_digest.slice(0,18))}…</span></div>` : ''}
-      ${a.impact_line ? `<div class="row"><span>📊</span><span>${escapeHTML(a.impact_line)}</span></div>` : ''}
-    `;
-    const times = el('div','a-times', `<div class="ago">${fmtTime(a.fired_at)}</div><div>${fmtAgo(a.fired_at)}</div>`);
+    const sev = sevColor(a.severity);
+    const blast = blastRadius(a.affected_pods || 1, a.severity);
+    const blastWrap = el('div','row');
+    blastWrap.append(blast);
+    impact.append(blastWrap);
+    if (a.impact_line) {
+      const r = el('div','row'); r.innerHTML = `<span>📊</span><span>${escapeHTML(a.impact_line)}</span>`;
+      impact.append(r);
+    }
+    if (a.time_to_detection_seconds) {
+      const r = el('div','row'); r.innerHTML = `<span>⏱️</span><span>Detected ${humSecs(a.time_to_detection_seconds)} after rollout</span>`;
+      impact.append(r);
+    }
+    if (a.image_digest) {
+      const r = el('div','row');
+      r.innerHTML = `<span>🏷️</span><span style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML(a.image_digest.slice(0,22))}…</span>`;
+      impact.append(r);
+    }
+    const times = el('div','a-times', `<div class="ago">${fmtTime(a.fired_at)}</div><div data-fired="${a.fired_at}">${fmtAgo(a.fired_at)}</div>`);
     meta.append(impact, times);
     card.append(meta);
 
@@ -661,13 +1043,19 @@
     const acts = el('div','a-actions');
     const view = el('button','btn primary','View details');
     view.onclick = () => showDetails(a.id);
+    acts.append(view);
+    if (a.deployment_correlated) {
+      const rb = el('button','btn','Rollback');
+      rb.onclick = () => showRollbackModal(a);
+      acts.append(rb);
+    }
     const silence = el('button','btn','Silence');
     silence.onclick = () => doAction(a.id, 'silence');
     const resolve = el('button','btn','Mark resolved');
     resolve.onclick = () => doAction(a.id, 'resolve');
     const ignore = el('button','btn ghost','Ignore');
     ignore.onclick = () => doAction(a.id, 'ignore');
-    acts.append(view, silence, resolve, ignore);
+    acts.append(silence, resolve, ignore);
     card.append(acts);
 
     // Suggestions (collapsed by default for the card; full in details modal)

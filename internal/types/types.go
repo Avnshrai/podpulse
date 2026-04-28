@@ -142,6 +142,10 @@ type Anomaly struct {
 	// short window after a rollout — the headline reflects this.
 	DeploymentCorrelated bool `json:"deployment_correlated,omitempty"`
 
+	// TimeToDetectionSeconds — for deployment-correlated anomalies, how
+	// long after the rollout did we detect the new errors.
+	TimeToDetectionSeconds int `json:"time_to_detection_seconds,omitempty"`
+
 	// Variants holds additional templates collapsed into this anomaly
 	// when grouping similar errors (e.g. "User not found" + "User not
 	// authorized to validate tenant"). The card shows the first as the
