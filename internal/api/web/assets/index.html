@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PodPulse</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #141821;
+    --panel-2: #1a1f2b;
+    --line: #232938;
+    --text: #e6e8ee;
+    --muted: #8a93a6;
+    --accent: #4cc2ff;
+    --low: #69d199;
+    --medium: #f7c548;
+    --high: #ff7a59;
+    --critical: #ff4d6d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #0e1119, #0b0d12);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header h1 {
+    font-size: 16px; margin: 0; letter-spacing: .3px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .pulse {
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 rgba(76, 194, 255, .6);
+    animation: pulse 1.6s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { transform: scale(.85); box-shadow: 0 0 0 0 rgba(76, 194, 255, .55); }
+    70%  { transform: scale(1);   box-shadow: 0 0 0 14px rgba(76, 194, 255, 0); }
+    100% { transform: scale(.85); box-shadow: 0 0 0 0 rgba(76, 194, 255, 0); }
+  }
+  header .meta {
+    margin-left: auto;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
+  main {
+    padding: 24px 28px 60px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 80px 0;
+  }
+  .empty .pulse {
+    width: 28px; height: 28px;
+    margin-bottom: 18px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    animation: slideIn .4s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .card.flash {
+    animation: slideIn .4s cubic-bezier(.2,.8,.2,1) both, flash 1.2s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px) scale(.99); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+  }
+  @keyframes flash {
+    0%   { background: var(--panel); }
+    20%  { background: rgba(76, 194, 255, .12); }
+    100% { background: var(--panel); }
+  }
+  .card.sev-low      { border-left-color: var(--low); }
+  .card.sev-medium   { border-left-color: var(--medium); }
+  .card.sev-high     { border-left-color: var(--high); }
+  .card.sev-critical { border-left-color: var(--critical); }
+
+  .card .top {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .card .kind {
+    font-weight: 600; letter-spacing: .2px;
+  }
+  .card .workload {
+    color: var(--accent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+  }
+  .card .sev {
+    margin-left: auto;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--panel-2);
+  }
+  .card .sev.sev-low      { color: var(--low); }
+  .card .sev.sev-medium   { color: var(--medium); }
+  .card .sev.sev-high     { color: var(--high); }
+  .card .sev.sev-critical { color: var(--critical); }
+
+  .card .rca { margin-top: 8px; color: var(--text); }
+  .card .template {
+    margin-top: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--panel-2);
+    padding: 8px 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .card .hint {
+    margin-top: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--low);
+    background: rgba(105, 209, 153, .07);
+    border: 1px dashed rgba(105, 209, 153, .25);
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+  .card .hint::before {
+    content: "$ ";
+    opacity: .5;
+  }
+  .card .footer {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 11px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="pulse"></span> PodPulse</h1>
+  <span class="meta" id="meta">connecting…</span>
+</header>
+
+<main>
+  <div id="list">
+    <div class="empty" id="empty">
+      <div class="pulse"></div>
+      <div>Watching cluster heartbeat. No anomalies yet.</div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+  const list = document.getElementById('list');
+  const empty = document.getElementById('empty');
+  const meta = document.getElementById('meta');
+  const seen = new Set();
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function renderCard(a) {
+    const card = el('div', 'card flash sev-' + a.severity);
+    card.dataset.id = a.id;
+
+    const top = el('div', 'top');
+    top.appendChild(el('span', 'kind', a.kind.replace(/_/g, ' ')));
+    top.appendChild(el('span', 'workload', a.workload.namespace + '/' + (a.workload.kind || '') + '/' + a.workload.name));
+    top.appendChild(el('span', 'sev sev-' + a.severity, a.severity));
+    card.appendChild(top);
+
+    if (a.rca) card.appendChild(el('div', 'rca', a.rca));
+    if (a.template) card.appendChild(el('div', 'template', a.template));
+    if (a.rollback_hint) card.appendChild(el('div', 'hint', a.rollback_hint));
+
+    const footer = el('div', 'footer');
+    footer.appendChild(el('span', null, 'fired ' + new Date(a.fired_at).toLocaleTimeString()));
+    footer.appendChild(el('span', null, 'pods ' + (a.affected_pods ?? 0)));
+    footer.appendChild(el('span', null, 'id ' + a.id));
+    card.appendChild(footer);
+
+    return card;
+  }
+
+  async function tick() {
+    try {
+      const r = await fetch('/v1/anomalies');
+      if (!r.ok) throw new Error(r.status);
+      const data = await r.json();
+      meta.textContent = `${data.count ?? 0} anomalies · ${new Date().toLocaleTimeString()}`;
+      const items = data.anomalies || [];
+      if (items.length > 0 && empty.parentNode) empty.remove();
+
+      // Render newest cards that we haven't seen yet, prepended.
+      for (let i = items.length - 1; i >= 0; i--) {
+        const a = items[i];
+        if (seen.has(a.id)) continue;
+        seen.add(a.id);
+        list.prepend(renderCard(a));
+      }
+    } catch (e) {
+      meta.textContent = 'detector unreachable';
+    }
+  }
+
+  tick();
+  setInterval(tick, 1500);
+</script>
+</body>
+</html>
