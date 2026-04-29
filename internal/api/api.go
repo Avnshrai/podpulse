@@ -32,6 +32,7 @@ import (
 	"github.com/podpulse/podpulse/internal/alert"
 	"github.com/podpulse/podpulse/internal/anomaly"
 	"github.com/podpulse/podpulse/internal/detect/templates"
+	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
 	"github.com/podpulse/podpulse/internal/rca"
 	"github.com/podpulse/podpulse/internal/redact"
@@ -39,33 +40,42 @@ import (
 )
 
 type Server struct {
-	store      *anomaly.Store
-	detector   *templates.Detector
-	dispatcher *alert.Dispatcher
-	webFS      fs.FS
-	k8sCache   *ppk8s.Cache
-	channels   []string // names of configured channels
-	startedAt  time.Time
+	store         *anomaly.Store
+	detector      *templates.Detector
+	dispatcher    *alert.Dispatcher
+	webFS         fs.FS
+	k8sCache      *ppk8s.Cache
+	configWatcher *ppk8s.ConfigWatcher
+	eventWatcher  *ppk8s.EventWatcher
+	issueEngine   *issue.Engine
+	channels      []string
+	startedAt     time.Time
 }
 
 type Options struct {
-	Store      *anomaly.Store
-	Detector   *templates.Detector
-	Dispatcher *alert.Dispatcher
-	WebFS      fs.FS
-	K8sCache   *ppk8s.Cache
-	Channels   []string
+	Store         *anomaly.Store
+	Detector      *templates.Detector
+	Dispatcher    *alert.Dispatcher
+	WebFS         fs.FS
+	K8sCache      *ppk8s.Cache
+	ConfigWatcher *ppk8s.ConfigWatcher
+	EventWatcher  *ppk8s.EventWatcher
+	IssueEngine   *issue.Engine
+	Channels      []string
 }
 
 func NewServer(opts Options) *Server {
 	return &Server{
-		store:      opts.Store,
-		detector:   opts.Detector,
-		dispatcher: opts.Dispatcher,
-		webFS:      opts.WebFS,
-		k8sCache:   opts.K8sCache,
-		channels:   opts.Channels,
-		startedAt:  time.Now(),
+		store:         opts.Store,
+		detector:      opts.Detector,
+		dispatcher:    opts.Dispatcher,
+		webFS:         opts.WebFS,
+		k8sCache:      opts.K8sCache,
+		configWatcher: opts.ConfigWatcher,
+		eventWatcher:  opts.EventWatcher,
+		issueEngine:   opts.IssueEngine,
+		channels:      opts.Channels,
+		startedAt:     time.Now(),
 	}
 }
 
@@ -87,6 +97,15 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /v1/incidents", s.handleListIncidents)
 	mux.HandleFunc("GET /v1/summary", s.handleSummary)
 	mux.HandleFunc("GET /v1/channels", s.handleListChannels)
+
+	// New: unified Issues + per-namespace timeline + config diff feed.
+	mux.HandleFunc("GET /v1/issues", s.handleListIssues)
+	mux.HandleFunc("GET /v1/issues/{id}", s.handleGetIssue)
+	mux.HandleFunc("POST /v1/issues/{id}/silence", s.handleIssueState("silenced"))
+	mux.HandleFunc("POST /v1/issues/{id}/resolve", s.handleIssueState("resolved"))
+	mux.HandleFunc("POST /v1/issues/{id}/ignore", s.handleIssueState("ignored"))
+	mux.HandleFunc("GET /v1/timeline", s.handleTimeline)
+	mux.HandleFunc("GET /v1/config-changes", s.handleConfigChanges)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -724,6 +743,166 @@ func (s *Server) handleSummary(w http.ResponseWriter, _ *http.Request) {
 
 	writeJSON(w, sum)
 }
+
+// --- Issues (unified incident view) ---
+
+func (s *Server) handleListIssues(w http.ResponseWriter, r *http.Request) {
+	if s.issueEngine == nil {
+		writeJSON(w, map[string]any{"issues": []*issue.Issue{}, "count": 0})
+		return
+	}
+	q := r.URL.Query()
+	all := s.issueEngine.All()
+	out := make([]*issue.Issue, 0, len(all))
+	wantType := q.Get("type")
+	wantState := q.Get("state")
+	wantNS := q.Get("namespace")
+	for _, iss := range all {
+		if wantType != "" && string(iss.Type) != wantType {
+			continue
+		}
+		if wantState != "" && iss.State != wantState {
+			continue
+		}
+		if wantNS != "" && iss.Workload.Namespace != wantNS {
+			continue
+		}
+		out = append(out, iss)
+	}
+	writeJSON(w, map[string]any{"issues": out, "count": len(out)})
+}
+
+func (s *Server) handleGetIssue(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if s.issueEngine == nil {
+		http.Error(w, "engine not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	iss, ok := s.issueEngine.Get(id)
+	if !ok {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, iss)
+}
+
+func (s *Server) handleIssueState(state string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if s.issueEngine == nil || !s.issueEngine.SetState(id, state) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		writeJSON(w, map[string]any{"id": id, "state": state})
+	}
+}
+
+// --- Timeline (what changed in a namespace recently) ---
+
+func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	ns := q.Get("namespace")
+	since := time.Now().Add(-1 * time.Hour)
+	if v := q.Get("since"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			since = time.Now().Add(-d)
+		}
+	}
+
+	type tlItem struct {
+		When  time.Time `json:"when"`
+		Kind  string    `json:"kind"`
+		Label string    `json:"label"`
+		Detail string   `json:"detail,omitempty"`
+	}
+	out := []tlItem{}
+
+	// Deployments in namespace.
+	if s.k8sCache != nil {
+		for wl, ro := range s.k8sCache.RolloutsSnapshot() {
+			if ns != "" && wl.Namespace != ns {
+				continue
+			}
+			if ro.When.Before(since) {
+				continue
+			}
+			detail := ro.Image
+			if ro.Commit != "" {
+				detail += " · " + ro.Commit[:min(7, len(ro.Commit))]
+			}
+			out = append(out, tlItem{When: ro.When, Kind: "deploy", Label: wl.Name + " rolled out", Detail: detail})
+		}
+	}
+	// Config changes in namespace.
+	if s.configWatcher != nil {
+		nsList := []string{ns}
+		if ns == "" {
+			nsList = []string{}
+			seen := map[string]struct{}{}
+			for _, c := range s.configWatcher.RecentChanges(500) {
+				if c.When.Before(since) {
+					continue
+				}
+				if _, ok := seen[c.Namespace]; ok {
+					continue
+				}
+				seen[c.Namespace] = struct{}{}
+				nsList = append(nsList, c.Namespace)
+			}
+		}
+		for _, n := range nsList {
+			for _, c := range s.configWatcher.ChangesForNamespace(n, since) {
+				detail := describeChangesShort(c.Changes)
+				out = append(out, tlItem{When: c.When, Kind: "config_change",
+					Label: string(c.Kind) + " " + c.Name + " changed", Detail: detail})
+			}
+		}
+	}
+	// Active issues / events.
+	if s.issueEngine != nil {
+		for _, iss := range s.issueEngine.All() {
+			if ns != "" && iss.Workload.Namespace != ns {
+				continue
+			}
+			if iss.FiredAt.Before(since) {
+				continue
+			}
+			out = append(out, tlItem{When: iss.FiredAt, Kind: "issue", Label: iss.HumanHeadline})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].When.Before(out[j].When) })
+	writeJSON(w, map[string]any{"items": out, "count": len(out)})
+}
+
+func describeChangesShort(changes []ppk8s.KeyChange) string {
+	if len(changes) == 0 {
+		return ""
+	}
+	if len(changes) == 1 {
+		c := changes[0]
+		return string(c.Type) + ": " + c.Key
+	}
+	return strconv.Itoa(len(changes)) + " keys changed"
+}
+
+// --- Config changes feed ---
+
+func (s *Server) handleConfigChanges(w http.ResponseWriter, r *http.Request) {
+	if s.configWatcher == nil {
+		writeJSON(w, map[string]any{"changes": []any{}, "count": 0})
+		return
+	}
+	limit := 100
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+	changes := s.configWatcher.RecentChanges(limit)
+	writeJSON(w, map[string]any{"changes": changes, "count": len(changes)})
+}
+
+func min(a, b int) int { if a < b { return a }; return b }
 
 // --- Channels ---
 

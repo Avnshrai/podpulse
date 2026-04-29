@@ -23,6 +23,7 @@ import (
 	"github.com/podpulse/podpulse/internal/api"
 	"github.com/podpulse/podpulse/internal/api/web"
 	"github.com/podpulse/podpulse/internal/detect/templates"
+	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
 )
 
@@ -65,6 +66,8 @@ func main() {
 	defer cancel()
 
 	var k8sCache *ppk8s.Cache
+	var configWatcher *ppk8s.ConfigWatcher
+	var eventWatcher *ppk8s.EventWatcher
 	if *k8sEnabled {
 		client, err := ppk8s.NewClient(*kubeconfig)
 		if err != nil {
@@ -72,22 +75,40 @@ func main() {
 				"err", err)
 		} else {
 			k8sCache = ppk8s.NewCache(logger)
+			configWatcher = ppk8s.NewConfigWatcher(k8sCache, logger)
+			eventWatcher = ppk8s.NewEventWatcher(logger)
 			go func() {
 				if err := k8sCache.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
-					slog.Error("informer loop exited", "err", err)
+					slog.Error("pod/rs/svc informer loop exited", "err", err)
 				}
 			}()
-			slog.Info("kubernetes integration enabled")
+			go func() {
+				if err := configWatcher.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
+					slog.Error("config watcher exited", "err", err)
+				}
+			}()
+			go func() {
+				if err := eventWatcher.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
+					slog.Error("event watcher exited", "err", err)
+				}
+			}()
+			slog.Info("kubernetes integration enabled (pods, replicasets, services, configmaps, secrets, events)")
 		}
 	}
 
+	issueEngine := issue.NewEngine(configWatcher, eventWatcher, k8sCache, store)
+	go runIssueRefresher(ctx, issueEngine)
+
 	server := api.NewServer(api.Options{
-		Store:      store,
-		Detector:   detector,
-		Dispatcher: dispatcher,
-		WebFS:      web.FS(),
-		K8sCache:   k8sCache,
-		Channels:   channels,
+		Store:         store,
+		Detector:      detector,
+		Dispatcher:    dispatcher,
+		WebFS:         web.FS(),
+		K8sCache:      k8sCache,
+		ConfigWatcher: configWatcher,
+		EventWatcher:  eventWatcher,
+		IssueEngine:   issueEngine,
+		Channels:      channels,
 	})
 
 	httpSrv := &http.Server{
@@ -113,4 +134,18 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	_ = httpSrv.Shutdown(shutdownCtx)
+}
+
+func runIssueRefresher(ctx context.Context, e *issue.Engine) {
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	e.Refresh()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			e.Refresh()
+		}
+	}
 }

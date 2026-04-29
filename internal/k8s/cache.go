@@ -59,11 +59,24 @@ type ServiceMeta struct {
 // Cache aggregates all informer-derived state.
 type Cache struct {
 	mu       sync.RWMutex
-	pods     map[podKey]PodMeta            // (ns, pod) → metadata
-	rollouts map[types.Workload]Rollout    // most recent rollout per workload
-	rsOwners map[podKey]ownerRef           // (ns, ReplicaSet name) → owning Deployment
-	services map[podKey]ServiceMeta        // (ns, svc-name) → metadata
-	logger   *slog.Logger
+	pods     map[podKey]PodMeta         // (ns, pod) → metadata
+	rollouts map[types.Workload]Rollout // most recent rollout per workload
+	rsOwners map[podKey]ownerRef        // (ns, ReplicaSet name) → owning Deployment
+	services map[podKey]ServiceMeta     // (ns, svc-name) → metadata
+	// podMountIndex tells the ConfigWatcher which pods mount which
+	// ConfigMaps and Secrets, for blast-radius computation.
+	podMountIndex map[podKey]PodMounts
+	logger        *slog.Logger
+}
+
+// PodMounts records the ConfigMaps and Secrets a pod consumes.
+type PodMounts struct {
+	Namespace         string
+	PodName           string
+	OwnerKind         string
+	OwnerName         string
+	MountedConfigMaps []string
+	MountedSecrets    []string
 }
 
 type podKey struct{ ns, name string }
@@ -127,11 +140,12 @@ func NewCache(logger *slog.Logger) *Cache {
 		logger = slog.Default()
 	}
 	return &Cache{
-		pods:     map[podKey]PodMeta{},
-		rollouts: map[types.Workload]Rollout{},
-		rsOwners: map[podKey]ownerRef{},
-		services: map[podKey]ServiceMeta{},
-		logger:   logger,
+		pods:          map[podKey]PodMeta{},
+		rollouts:      map[types.Workload]Rollout{},
+		rsOwners:      map[podKey]ownerRef{},
+		services:      map[podKey]ServiceMeta{},
+		podMountIndex: map[podKey]PodMounts{},
+		logger:        logger,
 	}
 }
 
@@ -211,8 +225,43 @@ func (c *Cache) onPodAdd(obj any) {
 	meta.OwnerKind = owner.kind
 	meta.OwnerName = owner.name
 
+	mounts := PodMounts{
+		Namespace: p.Namespace, PodName: p.Name,
+		OwnerKind: owner.kind, OwnerName: owner.name,
+	}
+	for _, c := range p.Spec.Containers {
+		for _, ef := range c.EnvFrom {
+			if ef.ConfigMapRef != nil {
+				mounts.MountedConfigMaps = append(mounts.MountedConfigMaps, ef.ConfigMapRef.Name)
+			}
+			if ef.SecretRef != nil {
+				mounts.MountedSecrets = append(mounts.MountedSecrets, ef.SecretRef.Name)
+			}
+		}
+		for _, e := range c.Env {
+			if e.ValueFrom == nil {
+				continue
+			}
+			if e.ValueFrom.ConfigMapKeyRef != nil {
+				mounts.MountedConfigMaps = append(mounts.MountedConfigMaps, e.ValueFrom.ConfigMapKeyRef.Name)
+			}
+			if e.ValueFrom.SecretKeyRef != nil {
+				mounts.MountedSecrets = append(mounts.MountedSecrets, e.ValueFrom.SecretKeyRef.Name)
+			}
+		}
+	}
+	for _, v := range p.Spec.Volumes {
+		if v.ConfigMap != nil {
+			mounts.MountedConfigMaps = append(mounts.MountedConfigMaps, v.ConfigMap.Name)
+		}
+		if v.Secret != nil {
+			mounts.MountedSecrets = append(mounts.MountedSecrets, v.Secret.SecretName)
+		}
+	}
+
 	c.mu.Lock()
 	c.pods[podKey{p.Namespace, p.Name}] = meta
+	c.podMountIndex[podKey{p.Namespace, p.Name}] = mounts
 	c.mu.Unlock()
 }
 

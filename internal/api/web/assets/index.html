@@ -552,9 +552,13 @@
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
       Overview
     </a>
-    <a class="nav-item active" data-route="anomalies">
+    <a class="nav-item active" data-route="issues">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 22h20L12 2zM12 9v5M12 18h.01"/></svg>
-      Anomalies <span class="badge" id="nav-anomalies-count">0</span>
+      Issues <span class="badge" id="nav-issues-count">0</span>
+    </a>
+    <a class="nav-item" data-route="changes">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h12"/></svg>
+      What changed
     </a>
     <a class="nav-item" data-route="workloads">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
@@ -651,21 +655,28 @@
 
   // -------------- API --------------
   const api = {
-    summary:    () => fetch('/v1/summary').then(r => r.json()),
-    anomalies:  q => fetch('/v1/anomalies?' + new URLSearchParams(q||{})).then(r => r.json()),
-    anomaly:    id => fetch('/v1/anomalies/' + encodeURIComponent(id)).then(r => r.json()),
-    setState:   (id, action) => fetch(`/v1/anomalies/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
-    workloads:  () => fetch('/v1/workloads').then(r => r.json()),
-    services:   () => fetch('/v1/services').then(r => r.json()),
-    deployments:() => fetch('/v1/deployments').then(r => r.json()),
-    events:     () => fetch('/v1/events').then(r => r.json()),
-    incidents:  () => fetch('/v1/incidents').then(r => r.json()),
-    channels:   () => fetch('/v1/channels').then(r => r.json()),
+    summary:      () => fetch('/v1/summary').then(r => r.json()),
+    anomalies:    q => fetch('/v1/anomalies?' + new URLSearchParams(q||{})).then(r => r.json()),
+    anomaly:      id => fetch('/v1/anomalies/' + encodeURIComponent(id)).then(r => r.json()),
+    setState:     (id, action) => fetch(`/v1/anomalies/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
+    issues:       q => fetch('/v1/issues?' + new URLSearchParams(q||{})).then(r => r.json()),
+    issue:        id => fetch('/v1/issues/' + encodeURIComponent(id)).then(r => r.json()),
+    issueState:   (id, action) => fetch(`/v1/issues/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
+    timeline:     q => fetch('/v1/timeline?' + new URLSearchParams(q||{})).then(r => r.json()),
+    configChanges:() => fetch('/v1/config-changes').then(r => r.json()),
+    workloads:    () => fetch('/v1/workloads').then(r => r.json()),
+    services:     () => fetch('/v1/services').then(r => r.json()),
+    deployments:  () => fetch('/v1/deployments').then(r => r.json()),
+    events:       () => fetch('/v1/events').then(r => r.json()),
+    incidents:    () => fetch('/v1/incidents').then(r => r.json()),
+    channels:     () => fetch('/v1/channels').then(r => r.json()),
   };
 
   // -------------- routing --------------
   const routes = {
     overview:    renderOverview,
+    issues:      renderIssues,
+    changes:     renderChanges,
     anomalies:   renderAnomalies,
     workloads:   renderWorkloads,
     incidents:   renderIncidents,
@@ -677,12 +688,13 @@
     settings:    renderSettings,
   };
   const titles = {
-    overview: 'Overview', anomalies: 'Anomalies', workloads: 'Workloads',
+    overview: 'Overview', issues: 'Issues', changes: 'What changed',
+    anomalies: 'Anomalies', workloads: 'Workloads',
     incidents: 'Incidents', deployments: 'Deployments', services: 'Services',
     events: 'Events', silences: 'Silences', channels: 'Channels', settings: 'Settings',
   };
 
-  let activeRoute = 'overview';
+  let activeRoute = 'issues';
   let activeSeverity = ''; // empty = all
   let showLow = false;     // collapse low-severity in the anomalies list by default
   $$('.nav-item').forEach(n => n.addEventListener('click', e => {
@@ -723,9 +735,9 @@
     try {
       const sum = await api.summary();
       lastSummary = sum;
-      $('#topbar-count').textContent = `${sum.total} anomalies`;
+      $('#topbar-count').textContent = `${sum.total} issues`;
       $('#topbar-time').textContent = new Date().toLocaleTimeString();
-      $('#nav-anomalies-count').textContent = sum.total;
+      const navIss = $('#nav-issues-count'); if (navIss) navIss.textContent = sum.total;
       $('#bell-count').textContent = sum.total;
       $('#bell-count').style.display = sum.total ? 'inline-block' : 'none';
     } catch(e) {
@@ -1011,7 +1023,360 @@
     showCommandModal(`Rollback ${wl.name}`, cmd);
   }
 
-  // -------------- Anomalies --------------
+  // -------------- Issues (root cause first) --------------
+  async function renderIssues() {
+    const data = await api.issues({});
+    const sum = lastSummary;
+    const m = $('#main');
+    m.innerHTML = '';
+
+    if (sum) $('#nav-issues-count').textContent = (data.issues||[]).length;
+
+    // Severity tabs (reuse summary breakdown).
+    const tabs = el('div','tabs');
+    const allTab = el('div','tab' + (activeSeverity===''?' active':''),
+      `All issues <span class="num">${(data.issues||[]).length}</span>`);
+    allTab.onclick = () => { activeSeverity=''; rerender(true); };
+    tabs.append(allTab);
+    [['critical','crit'],['high','high'],['medium','med'],['low','low']].forEach(([k,c]) => {
+      const t = el('div',`tab ${c}` + (activeSeverity===k?' active':''),
+        `<div class="dot"></div> ${k[0].toUpperCase()+k.slice(1)} <span class="num">${(sum && sum.by_severity || {})[k]||0}</span>`);
+      t.onclick = () => { activeSeverity = (activeSeverity===k?'':k); rerender(true); };
+      tabs.append(t);
+    });
+    m.append(tabs);
+
+    if (!data.issues || data.issues.length === 0) {
+      m.append(el('div','empty','<div class="pulse-dot"></div>No issues. Cluster looks calm.'));
+    } else {
+      // Group: high-severity first; collapse low.
+      let issues = data.issues;
+      if (activeSeverity) issues = issues.filter(i => i.severity === activeSeverity);
+      const high = issues.filter(i => i.severity !== 'low');
+      const low = issues.filter(i => i.severity === 'low');
+      const showingLow = activeSeverity === 'low' || showLow;
+      high.forEach(iss => m.append(issueCard(iss)));
+      if (!showingLow && low.length > 0) {
+        const fold = el('div','low-fold',
+          `${low.length} low-impact issue${low.length===1?'':'s'} hidden — click to expand`);
+        fold.onclick = () => { showLow = true; rerender(true); };
+        m.append(fold);
+      } else {
+        low.forEach(iss => m.append(issueCard(iss)));
+      }
+    }
+    renderRail(sum);
+  }
+
+  function issueCard(iss) {
+    const sev = sevColor(iss.severity);
+    const card = el('div', `a-card sev-${sev}`);
+
+    // Top row: type tag + urgency + workload path + severity
+    const top = el('div','a-top');
+    const typeIcons = {
+      log_anomaly:  '📈 LOG ANOMALY',
+      config_issue: '⚙️ CONFIG ISSUE',
+      crash_loop:   '🔁 CRASH LOOP',
+      scheduling:   '🚧 SCHEDULING',
+    };
+    const typeCls = iss.type === 'config_issue' ? 'a-tag' :
+                    iss.type === 'crash_loop' ? 'a-tag crit' :
+                    iss.type === 'scheduling' ? 'a-tag high' : 'a-tag';
+    top.append(el('span', typeCls, typeIcons[iss.type] || iss.type.toUpperCase()));
+    if (iss.urgency) {
+      const urgIcon = ({worsening:'🔴', active:'🟠', new:'🔵', settled:'🟢'})[iss.urgency] || '⚫';
+      const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[iss.urgency] || iss.urgency;
+      top.append(el('span', `urg ${iss.urgency}`, `${urgIcon} ${urgLbl}`));
+    }
+    top.append(el('span','a-path', escapeHTML(wlPath(iss.workload))));
+    top.append(el('span','a-sev', sevPretty(iss.severity)));
+    card.append(top);
+
+    // Headlines (3-tier-ish: human → technical → workload)
+    card.append(el('div','h-tier1', '🚨 ' + escapeHTML(iss.human_headline || 'Issue')));
+    if (iss.technical_headline) card.append(el('div','h-tier2', escapeHTML(iss.technical_headline)));
+    if (iss.short_story) card.append(el('div','a-story', escapeHTML(iss.short_story)));
+
+    // Type-specific body
+    if (iss.type === 'config_issue' && iss.config_issue) renderConfigIssueBody(card, iss);
+    if (iss.type === 'crash_loop' && iss.crash_loop) renderCrashBody(card, iss);
+    if (iss.type === 'scheduling' && iss.scheduling) renderSchedBody(card, iss);
+    if (iss.type === 'log_anomaly' && iss.log_anomaly) renderLogBody(card, iss);
+
+    // Common: impact + ttd
+    const meta = el('div','a-meta');
+    const impact = el('div','a-impact');
+    const impCls = ({low:'low', medium:'med', high:'high', critical:'crit'})[iss.impact_level || 'low'] || 'low';
+    const impLabel = ({low:'LOW', medium:'MEDIUM', high:'HIGH', critical:'CRITICAL'})[iss.impact_level || 'low'] || 'LOW';
+    const r1 = el('div','row');
+    r1.append(el('span', `imp-label ${impCls}`, `Impact: ${impLabel}`));
+    impact.append(r1);
+    if (iss.affected_pods) {
+      const r2 = el('div','row');
+      r2.append(blastRadius(iss.affected_pods, iss.severity));
+      impact.append(r2);
+    }
+    const times = el('div','a-times', `<div class="ago">${fmtTime(iss.fired_at)}</div><div data-fired="${iss.fired_at}">${fmtAgo(iss.fired_at)}</div>`);
+    meta.append(impact, times);
+    card.append(meta);
+
+    // Confidence + factors
+    if (iss.confidence) {
+      const conf = el('div','a-confidence');
+      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${iss.confidence}%"></div></div><strong>${iss.confidence}%</strong>`;
+      card.append(conf);
+      if (iss.confidence_factors && iss.confidence_factors.length) {
+        const ex = el('div','conf-explain');
+        ex.innerHTML = `Based on:<ul>${iss.confidence_factors.map(f => `<li>${escapeHTML(f)}</li>`).join('')}</ul>`;
+        card.append(ex);
+      }
+    }
+
+    // What happened
+    if (iss.what_happened) {
+      const nar = el('div','narrative');
+      nar.innerHTML = `<h4>What happened</h4>${escapeHTML(iss.what_happened)}` +
+        (iss.likely_cause ? `<div class="cause"><strong>Likely cause:</strong> ${escapeHTML(iss.likely_cause)}</div>` : '');
+      card.append(nar);
+    }
+
+    // Timeline ("what changed")
+    if (iss.timeline && iss.timeline.length) {
+      const tl = el('div','a-timeline');
+      iss.timeline.forEach((step, i) => {
+        if (i > 0) tl.append(el('span','arrow','→'));
+        const icon = ({deploy:'🚀', config_change:'⚙️', error_observed:'⚠️', event:'⚡'})[step.kind] || '•';
+        const s = el('span','step');
+        s.innerHTML = `<strong>${fmtTime(step.when)}</strong> ${icon} ${escapeHTML(step.label)}`;
+        tl.append(s);
+      });
+      card.append(tl);
+    }
+
+    // Actions
+    const acts = el('div','a-actions');
+    const view = el('button','btn primary','Investigate');
+    view.onclick = () => showIssueModal(iss.id);
+    acts.append(view);
+    const sil = el('button','btn','Silence');
+    sil.onclick = () => doIssueAction(iss.id, 'silence');
+    const res = el('button','btn','Mark resolved');
+    res.onclick = () => doIssueAction(iss.id, 'resolve');
+    const ign = el('button','btn ghost','Ignore');
+    ign.onclick = () => doIssueAction(iss.id, 'ignore');
+    acts.append(sil, res, ign);
+    card.append(acts);
+
+    // Numbered next steps
+    if (iss.suggested_fix && iss.suggested_fix.length) {
+      const steps = el('div','steps');
+      steps.append(el('h4','','Next steps'));
+      iss.suggested_fix.slice(0, 3).forEach((s, i) => {
+        const row = el('div','step');
+        row.append(el('div','step-num', String(i+1)));
+        const body = el('div','step-body');
+        body.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>` +
+          (s.answer ? `<div class="why" style="color:var(--text);font-size:13px;white-space:pre-line;margin-top:4px">${escapeHTML(s.answer)}</div>` : '') +
+          (s.command ? `<code>${escapeHTML(s.command)}</code>` : '') +
+          (s.why ? `<div class="why">${escapeHTML(s.why)}</div>` : '');
+        row.append(body);
+        steps.append(row);
+      });
+      if (iss.suggested_fix.length > 3) {
+        steps.append(el('div','why', `+${iss.suggested_fix.length-3} more in details`));
+      }
+      card.append(steps);
+    }
+
+    return card;
+  }
+
+  function renderConfigIssueBody(card, iss) {
+    const c = iss.config_issue;
+    const panel = el('div','ba-panel');
+    panel.style.gridTemplateColumns = '1fr';
+    let body = `<div class="l">Changes detected</div>`;
+    body += '<div style="margin-top:6px;font-size:13px;line-height:1.6">';
+    (c.changes||[]).forEach(ch => {
+      const icon = ({malformed_json:'❌', became_empty:'⚠️', removed:'🗑️', value_changed:'✏️', from_empty:'✓', added:'➕'})[ch.type] || '•';
+      let line = `${icon} <code style="color:var(--accent);font-family:ui-monospace,monospace">${escapeHTML(ch.key)}</code>`;
+      if (ch.type === 'value_changed' && (ch.old_value || ch.new_value)) {
+        line += ` <span style="color:var(--muted)">"${escapeHTML(ch.old_value||'')}" → "${escapeHTML(ch.new_value||'')}"</span>`;
+      } else if (ch.type === 'became_empty') {
+        line += ` <span style="color:var(--high)">→ empty</span>`;
+        if (ch.old_value) line += ` <span style="color:var(--muted)">(was "${escapeHTML(ch.old_value)}")</span>`;
+      } else if (ch.type === 'malformed_json') {
+        line += ` <span style="color:var(--critical)">→ ${escapeHTML(ch.note||'invalid JSON')}</span>`;
+      } else if (ch.type === 'removed') {
+        line += ` <span style="color:var(--high)">→ removed</span>`;
+      }
+      body += `<div>${line}</div>`;
+    });
+    body += '</div>';
+    if (c.mounts && c.mounts.length) {
+      body += `<div class="l" style="margin-top:10px">Pods that mount this</div>`;
+      body += '<div style="margin-top:4px;font-size:13px">';
+      c.mounts.slice(0, 5).forEach(m => {
+        body += `<div>• <strong>${escapeHTML(m.owner_kind)}/${escapeHTML(m.owner_name)}</strong> in ${escapeHTML(m.namespace)}</div>`;
+      });
+      if (c.mounts.length > 5) body += `<div style="color:var(--muted)">+${c.mounts.length-5} more</div>`;
+      body += '</div>';
+    }
+    panel.innerHTML = body;
+    card.append(panel);
+  }
+
+  function renderCrashBody(card, iss) {
+    const c = iss.crash_loop;
+    const panel = el('div','ba-panel');
+    panel.innerHTML = `
+      <div class="ba-cell"><div class="l">Reason</div><div class="n bad" style="font-size:18px">${escapeHTML(c.reason||'unknown')}</div><div class="s">k8s event reason</div></div>
+      <div class="ba-cell"><div class="l">Restarts</div><div class="n bad">${c.restarts||0}</div><div class="s">in window</div></div>
+      <div class="ba-change"><div class="v">${escapeHTML(iss.pod||'')}</div><div class="l">pod</div></div>
+    `;
+    card.append(panel);
+    if (c.last_event) {
+      const ev = el('div','narrative');
+      ev.style.borderLeftColor = 'var(--critical)';
+      ev.innerHTML = `<h4>Last K8s event</h4><code style="font-size:12px;color:var(--text);background:transparent;padding:0">${escapeHTML(c.last_event)}</code>`;
+      card.append(ev);
+    }
+  }
+
+  function renderSchedBody(card, iss) {
+    const s = iss.scheduling;
+    const ev = el('div','narrative');
+    ev.style.borderLeftColor = 'var(--high)';
+    ev.innerHTML = `<h4>Scheduler said</h4><code style="font-size:12px;color:var(--text);background:transparent;padding:0">${escapeHTML(s.message||s.reason||'')}</code>`;
+    card.append(ev);
+  }
+
+  function renderLogBody(card, iss) {
+    const l = iss.log_anomaly;
+    if (l.before_after) {
+      const ba = l.before_after;
+      const panel = el('div','ba-panel');
+      panel.innerHTML = `
+        <div class="ba-cell"><div class="l">Before deploy</div><div class="n ${ba.before>0?'bad':'ok'}">${ba.before}</div><div class="s">errors of this kind</div></div>
+        <div class="ba-cell"><div class="l">After deploy</div><div class="n ${ba.after>0?'bad':'ok'}">${ba.after}${ba.after>ba.before?' ↑':''}</div><div class="s">errors of this kind</div></div>
+        <div class="ba-change"><div class="v${ba.change_pct<0?' inf':''}">${ba.change_pct<0?'+∞%':((ba.change_pct>=0?'+':'')+ba.change_pct+'%')}</div><div class="l">change</div></div>
+      `;
+      card.append(panel);
+    }
+    if (l.template) {
+      card.append(el('div','h-tier3', escapeHTML(l.template)));
+    }
+  }
+
+  async function doIssueAction(id, action) {
+    try { await api.issueState(id, action); toast(action[0].toUpperCase()+action.slice(1)+'d'); tick(); }
+    catch(e) { toast('Failed: '+e.message); }
+  }
+
+  async function showIssueModal(id) {
+    try {
+      const iss = await api.issue(id);
+      const shade = el('div','modal-shade');
+      const m = el('div','modal');
+      m.style.cssText = 'max-width:780px;width:100%;max-height:85vh;overflow-y:auto;padding:24px';
+      m.innerHTML = `
+        <h3 style="margin:0 0 6px;font-size:20px">🚨 ${escapeHTML(iss.human_headline||'Issue')}</h3>
+        ${iss.technical_headline ? `<div style="color:var(--muted);margin-bottom:12px">${escapeHTML(iss.technical_headline)}</div>`:''}
+      `;
+      // Root cause section
+      if (iss.likely_cause) {
+        const rc = el('div','rec-card');
+        rc.innerHTML = `<h3>🎯 Likely cause</h3><div>${escapeHTML(iss.likely_cause)}</div>`;
+        m.append(rc);
+      }
+      // What happened
+      if (iss.what_happened) {
+        const nar = el('div','narrative');
+        nar.style.marginTop = '14px';
+        nar.innerHTML = `<h4>What happened</h4>${escapeHTML(iss.what_happened)}`;
+        m.append(nar);
+      }
+      // Timeline
+      if (iss.timeline && iss.timeline.length) {
+        const tlBox = el('div'); tlBox.style.marginTop = '16px';
+        tlBox.innerHTML = `<h4 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 8px">What changed (timeline)</h4>`;
+        const list = el('div');
+        list.style.cssText = 'background:var(--panel-2);border-radius:6px;padding:10px 12px';
+        iss.timeline.forEach((step, i) => {
+          const icon = ({deploy:'🚀', config_change:'⚙️', error_observed:'⚠️', event:'⚡', issue:'🚨'})[step.kind] || '•';
+          const row = el('div'); row.style.cssText='display:grid;grid-template-columns:60px auto 1fr;gap:8px;padding:5px 0;font-size:13px';
+          row.innerHTML = `<div style="color:var(--muted);font-variant-numeric:tabular-nums">${fmtTime(step.when)}</div><div>${icon}</div><div><strong>${escapeHTML(step.label)}</strong>${step.detail?` <span style="color:var(--muted)">— ${escapeHTML(step.detail)}</span>`:''}</div>`;
+          list.append(row);
+        });
+        tlBox.append(list);
+        m.append(tlBox);
+      }
+      // Suggested fix — full
+      if (iss.suggested_fix && iss.suggested_fix.length) {
+        const sec = el('div'); sec.style.marginTop='16px';
+        sec.innerHTML = `<h4 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 8px">Suggested fix</h4>`;
+        iss.suggested_fix.forEach((s, i) => {
+          const row = el('div','step');
+          row.append(el('div','step-num', String(i+1)));
+          const body = el('div','step-body');
+          body.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>` +
+            (s.answer ? `<div style="color:var(--text);margin-top:4px;white-space:pre-line">${escapeHTML(s.answer)}</div>` : '') +
+            (s.command ? `<code>${escapeHTML(s.command)}</code>` : '') +
+            (s.why ? `<div class="why">${escapeHTML(s.why)}</div>` : '');
+          row.append(body);
+          sec.append(row);
+        });
+        m.append(sec);
+      }
+      // Type-specific raw
+      if (iss.log_anomaly && iss.log_anomaly.template) {
+        const t = el('div'); t.style.marginTop='16px';
+        t.innerHTML = `<h4 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 6px">Raw template</h4><div class="cmd">${escapeHTML(iss.log_anomaly.template)}</div>`;
+        m.append(t);
+      }
+      const closeRow = el('div','actions');
+      const close = el('button','btn ghost','Close');
+      close.onclick = () => shade.remove();
+      closeRow.append(close);
+      m.append(closeRow);
+      shade.append(m);
+      shade.onclick = e => { if (e.target === shade) shade.remove(); };
+      document.body.append(shade);
+    } catch(e) { toast('Failed: '+e.message); }
+  }
+
+  // -------------- What changed (timeline page) --------------
+  async function renderChanges() {
+    const data = await api.timeline({since: '6h'});
+    const m = $('#main');
+    m.innerHTML = '';
+    const card = el('div','pcard');
+    card.append(el('h3','','📜 What changed in the last 6 hours'));
+    card.append(el('div', '', '<div style="color:var(--muted);font-size:12.5px;margin-bottom:10px">Deploys, configmap/secret edits, and observed issues — chronological. The single most useful debugging view.</div>'));
+    if (!data.items || !data.items.length) {
+      card.append(el('div','empty','Nothing has changed in the last 6 hours.'));
+    } else {
+      const list = el('div');
+      list.style.cssText = 'background:var(--panel-2);border-radius:8px;padding:12px 16px';
+      data.items.reverse().forEach(item => {
+        const icon = ({deploy:'🚀', config_change:'⚙️', issue:'🚨'})[item.kind] || '•';
+        const row = el('div');
+        row.style.cssText = 'display:grid;grid-template-columns:80px 30px 1fr;gap:10px;padding:7px 0;border-bottom:1px dashed var(--border);font-size:13.5px';
+        row.innerHTML = `
+          <div style="color:var(--muted);font-variant-numeric:tabular-nums">${fmtTime(item.when)}</div>
+          <div>${icon}</div>
+          <div><strong>${escapeHTML(item.label)}</strong>${item.detail?` <span style="color:var(--muted)">— ${escapeHTML(item.detail)}</span>`:''}</div>
+        `;
+        list.append(row);
+      });
+      card.append(list);
+    }
+    m.append(card);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Anomalies (legacy view, kept) --------------
   async function renderAnomalies() {
     const sum = lastSummary || await api.summary();
     const data = await api.anomalies({limit: 200, severity: activeSeverity, since: '6h'});
