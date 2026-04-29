@@ -152,6 +152,30 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		}
 		rca.Fill(a, rcaRollout)
 
+		// 5a. Compute Before/After deployment counts for the hero panel.
+		if !rcaRollout.When.IsZero() {
+			window := time.Since(rcaRollout.When)
+			if window < 5*time.Minute {
+				window = 5 * time.Minute
+			}
+			if window > 30*time.Minute {
+				window = 30 * time.Minute
+			}
+			before, after := s.detector.HitsAround(a.Workload, a.Template, rcaRollout.When, window)
+			ba := &types.BeforeAfter{
+				WindowSeconds: int(window.Seconds()),
+				Before:        before,
+				After:         after,
+			}
+			switch {
+			case before == 0 && after > 0:
+				ba.ChangePct = -1 // sentinel for ∞
+			case before > 0:
+				ba.ChangePct = (after - before) * 100 / before
+			}
+			a.BeforeAfter = ba
+		}
+
 		stored, fresh := s.store.Record(*a)
 		if !fresh {
 			continue

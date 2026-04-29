@@ -28,8 +28,9 @@ type Rollout struct {
 }
 
 // Fill mutates the anomaly in place, populating every human-readable
-// field: Headline, ShortStory, RCA, Impact, ImpactLine, Timeline,
-// Confidence, DeploymentCorrelated, and Suggestions.
+// field. Three-tier headline (HumanHeadline → TechnicalHeadline →
+// ShortStory) + narrative (WhatHappened) + Likely cause + explainable
+// confidence (ConfidenceFactors).
 func Fill(a *types.Anomaly, recent Rollout) {
 	deploymentRecent := !recent.When.IsZero() && time.Since(recent.When) < 30*time.Minute
 	a.DeploymentCorrelated = deploymentRecent
@@ -41,12 +42,140 @@ func Fill(a *types.Anomaly, recent Rollout) {
 	}
 
 	a.Impact, a.ImpactLine = impactFor(*a)
-	a.Headline = headline(*a, recent, deploymentRecent)
+	a.Urgency = urgencyFor(*a, recent, deploymentRecent)
+	a.HumanHeadline = humanHeadline(*a, recent, deploymentRecent)
+	a.TechnicalHeadline = technicalHeadline(*a)
+	a.Headline = a.HumanHeadline // backwards-compat for Slack/CLI
 	a.ShortStory = shortStory(*a, recent, deploymentRecent)
+	a.WhatHappened = whatHappened(*a, recent, deploymentRecent)
+	a.LikelyCause = likelyCause(*a, recent, deploymentRecent)
 	a.RCA = sentence(*a, recent)
 	a.Timeline = buildTimeline(*a, recent, deploymentRecent)
 	a.Confidence = confidence(*a, recent, deploymentRecent)
+	a.ConfidenceFactors = confidenceFactors(*a, recent, deploymentRecent)
 	a.Suggestions = buildSuggestions(*a, recent)
+}
+
+// --- three-tier headline framing ---
+
+// humanHeadline is the FIRST line on the card — what an SRE would say
+// out loud. No template tokens, no jargon.
+func humanHeadline(a types.Anomaly, r Rollout, deployRecent bool) string {
+	if deployRecent {
+		return "Errors after deployment in " + a.Workload.Name
+	}
+	if a.FirstSeenInVersion {
+		return "New errors in " + a.Workload.Name
+	}
+	switch a.Kind {
+	case types.AnomalyTemplateRate:
+		return "Error rate spiking in " + a.Workload.Name
+	case types.AnomalyStatusCodeShift:
+		return "5xx error rate climbing in " + a.Workload.Name
+	case types.AnomalyRestartRate:
+		return "Pods restarting unusually often in " + a.Workload.Name
+	}
+	return "Anomaly in " + a.Workload.Name
+}
+
+// technicalHeadline is the SECOND line — short plain-English summary
+// of the error topic, e.g. "Redis connection refused" or
+// "/api/users requests failing".
+func technicalHeadline(a types.Anomaly) string {
+	topic := errorTopic(a)
+	if rxAPIPath.MatchString(a.Template) {
+		if m := rxAPIPath.FindStringSubmatch(a.Template); len(m) > 0 {
+			return m[0] + " requests are failing"
+		}
+	}
+	return topic
+}
+
+var rxAPIPath = regexp.MustCompile(`/api/[A-Za-z0-9._/-]+`)
+
+// --- urgency ---
+
+func urgencyFor(a types.Anomaly, r Rollout, deployRecent bool) string {
+	switch {
+	case a.Kind == types.AnomalyTemplateRate, a.Kind == types.AnomalyStatusCodeShift:
+		return "worsening"
+	case deployRecent:
+		return "active"
+	case a.AffectedPods > 1:
+		return "active"
+	case a.FirstSeenInVersion:
+		return "new"
+	}
+	return "active"
+}
+
+// --- WhatHappened narrative ---
+
+func whatHappened(a types.Anomaly, r Rollout, deployRecent bool) string {
+	var b strings.Builder
+	if deployRecent {
+		fmt.Fprintf(&b, "A new deployment was rolled out at %s. ", r.When.Format("3:04 PM"))
+		if a.TimeToDetectionSeconds > 0 {
+			fmt.Fprintf(&b, "%s later, a new error pattern appeared. ",
+				humanDuration(time.Duration(a.TimeToDetectionSeconds)*time.Second))
+		} else {
+			b.WriteString("Shortly after, a new error pattern appeared. ")
+		}
+		if a.AffectedPods > 1 {
+			fmt.Fprintf(&b, "It is now affecting %d pods of the workload.", a.AffectedPods)
+		} else {
+			b.WriteString("So far it is affecting a single pod.")
+		}
+		return b.String()
+	}
+	if a.FirstSeenInVersion {
+		fmt.Fprintf(&b, "An error pattern not seen on prior versions of %s started appearing under the current image. ", a.Workload.Name)
+		if a.AffectedPods > 1 {
+			fmt.Fprintf(&b, "It is affecting %d pods.", a.AffectedPods)
+		}
+		return b.String()
+	}
+	fmt.Fprintf(&b, "A previously-unseen error pattern started appearing on %s.", a.Workload.Name)
+	if a.AffectedPods > 1 {
+		fmt.Fprintf(&b, " %d pods are affected.", a.AffectedPods)
+	}
+	return b.String()
+}
+
+func likelyCause(a types.Anomaly, r Rollout, deployRecent bool) string {
+	if deployRecent {
+		return "Regression in latest version (" + truncate(r.Image, 80) + ")."
+	}
+	if a.FirstSeenInVersion {
+		return "New code path or dependency change in current image."
+	}
+	return "Unknown — investigate logs and recent infra changes."
+}
+
+// --- explainable confidence ---
+
+func confidenceFactors(a types.Anomaly, r Rollout, deployRecent bool) []string {
+	out := []string{}
+	if deployRecent {
+		out = append(out, fmt.Sprintf("Deployment timing — workload rolled out %s before this fired",
+			humanDuration(a.FiredAt.Sub(r.When))))
+	}
+	if a.FirstSeenInVersion {
+		out = append(out, "New error pattern — never seen on prior image-digests of this workload")
+	}
+	switch a.Kind {
+	case types.AnomalyTemplateRate:
+		out = append(out, "Error rate jumped above the baseline EWMA")
+	case types.AnomalyRestartRate:
+		out = append(out, "Pod restart rate change-point detected")
+	}
+	if a.AffectedPods > 1 {
+		out = append(out, fmt.Sprintf("Spread across %d pods (not isolated to one)", a.AffectedPods))
+	}
+	if len(out) == 0 {
+		out = append(out, "Single new template observed; needs corroboration over time")
+	}
+	return out
 }
 
 // --- Headline / ShortStory ---

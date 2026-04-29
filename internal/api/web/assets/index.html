@@ -416,6 +416,100 @@
   }
   .low-fold:hover { background: var(--panel-3); }
 
+  /* Three-tier headline */
+  .h-tier1 { font-size: 19px; font-weight: 700; letter-spacing: .2px; }
+  .h-tier2 { color: var(--muted); margin-top: 2px; font-size: 14px; }
+  .h-tier3 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--muted); margin-top: 6px; word-break: break-all; opacity: .7; }
+
+  /* Urgency pill */
+  .urg { font-size: 10.5px; padding: 3px 9px; border-radius: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
+  .urg.new       { background: rgba(76,194,255,.14); color: var(--accent); }
+  .urg.active    { background: rgba(255,138,61,.14); color: var(--high); }
+  .urg.worsening { background: rgba(255,77,109,.14); color: var(--critical); }
+  .urg.settled   { background: rgba(105,209,153,.12); color: var(--ok); }
+
+  /* Impact label */
+  .imp-label { font-size: 12.5px; font-weight: 600; }
+  .imp-label.low  { color: var(--low); }
+  .imp-label.med  { color: var(--medium); }
+  .imp-label.high { color: var(--high); }
+  .imp-label.crit { color: var(--critical); }
+
+  /* Confidence factors list */
+  .conf-explain { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+  .conf-explain ul { margin: 4px 0 0 0; padding-left: 16px; }
+  .conf-explain li { margin: 2px 0; }
+  .conf-help {
+    margin-left: 8px; cursor: help;
+    color: var(--muted); border: 1px solid var(--border);
+    border-radius: 50%; width: 14px; height: 14px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+
+  /* Before/after panel */
+  .ba-panel {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 14px; margin-top: 14px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .ba-cell .l { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .ba-cell .n { font-size: 22px; font-weight: 700; }
+  .ba-cell .n.bad { color: var(--high); }
+  .ba-cell .n.ok { color: var(--ok); }
+  .ba-cell .s { font-size: 11.5px; color: var(--muted); }
+  .ba-change { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
+  .ba-change .v { font-size: 18px; font-weight: 700; color: var(--critical); }
+  .ba-change .v.inf { font-size: 22px; }
+  .ba-change .l { font-size: 10.5px; color: var(--muted); }
+
+  /* What-happened narrative */
+  .narrative {
+    background: var(--panel-2);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 14px;
+    color: var(--text);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .narrative h4 { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 500; }
+  .cause { color: var(--medium); margin-top: 6px; font-size: 13px; }
+
+  /* Numbered next-steps */
+  .steps { margin-top: 12px; }
+  .steps h4 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
+  .step {
+    display: grid; grid-template-columns: 28px 1fr; gap: 10px;
+    margin-bottom: 8px; align-items: start;
+  }
+  .step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    color: var(--accent);
+    font-size: 12px; font-weight: 600;
+    display: grid; place-items: center;
+    border: 1px solid var(--border);
+  }
+  .step-body { font-size: 13.5px; }
+  .step-body .t { font-weight: 500; }
+  .step-body code {
+    display: block;
+    background: #0a0c11;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-top: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--ok);
+    word-break: break-all;
+  }
+  .step-body .why { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
   /* Modal (rollback command) */
   .modal-shade { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 60; display: grid; place-items: center; padding: 30px; }
   .modal {
@@ -746,15 +840,24 @@
     }
     const sev = p.severity || 'medium';
     card.style.borderLeftColor = `var(--${sev})`;
-    card.append(el('h3','','🚨 Primary incident'));
+    const headRow = el('div');
+    headRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:8px';
+    headRow.append(el('h3','','🚨 Primary incident'));
+    if (p.urgency) {
+      const urgIcon = ({worsening:'🔴', active:'🟠', new:'🔵', settled:'🟢'})[p.urgency] || '⚫';
+      const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[p.urgency] || p.urgency;
+      headRow.append(el('span', `urg ${p.urgency}`, `${urgIcon} ${urgLbl}`));
+    }
+    card.append(headRow);
 
-    const head = el('div');
-    head.style.cssText = 'font-size:18px;font-weight:600;margin-bottom:6px';
-    head.innerHTML = (p.deployment_correlated ? '🚀 ' : '⚠️ ') + escapeHTML(p.headline || 'Anomaly');
-    card.append(head);
+    // Three-tier headline
+    const tier1 = el('div','h-tier1');
+    tier1.innerHTML = (p.deployment_correlated ? '🚨 ' : '⚠️ ') + escapeHTML(p.human_headline || p.headline || 'Anomaly');
+    card.append(tier1);
+    if (p.technical_headline) card.append(el('div','h-tier2', escapeHTML(p.technical_headline)));
 
     const path = el('div');
-    path.style.cssText = 'font-family:ui-monospace,monospace;color:var(--muted);font-size:12.5px;margin-bottom:10px';
+    path.style.cssText = 'font-family:ui-monospace,monospace;color:var(--muted);font-size:12px;margin:8px 0 10px';
     path.textContent = wlPath(p.workload);
     card.append(path);
 
@@ -763,19 +866,31 @@
       card.append(s);
     }
 
-    // mini-stats
+    // Impact label + blast + TTD line
     const stats = el('div');
-    stats.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin-bottom:10px';
-    const blast = blastRadius(p.affected_pods, sev);
-    stats.append(blast);
-    if (p.impact_line) stats.append(el('span','',escapeHTML(p.impact_line)));
-    if (p.time_to_detection_seconds) stats.append(el('span','',`Detected ${humSecs(p.time_to_detection_seconds)} after rollout`));
+    stats.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:12.5px;margin-bottom:8px';
+    const impCls = ({low:'low', medium:'med', high:'high', critical:'crit'})[p.impact_level || 'low'] || 'low';
+    const impLabel = ({low:'LOW', medium:'MEDIUM', high:'HIGH', critical:'CRITICAL'})[p.impact_level || 'low'] || 'LOW';
+    stats.append(el('span', `imp-label ${impCls}`, `Impact: ${impLabel}`));
+    stats.append(blastRadius(p.affected_pods, sev));
+    if (p.time_to_detection_seconds) stats.append(el('span','',`⏱️ Detected ${humSecs(p.time_to_detection_seconds)} after rollout`));
     card.append(stats);
 
-    // confidence
+    // Before vs After mini-panel
+    if (p.before_after) {
+      const ba = p.before_after;
+      const panel = el('div','ba-panel');
+      panel.innerHTML = `
+        <div class="ba-cell"><div class="l">Before</div><div class="n ${ba.before>0?'bad':'ok'}">${ba.before}</div><div class="s">errors</div></div>
+        <div class="ba-cell"><div class="l">After</div><div class="n ${ba.after>0?'bad':'ok'}">${ba.after}${ba.after>ba.before?' ↑':''}</div><div class="s">errors</div></div>
+        <div class="ba-change"><div class="v${ba.change_pct<0?' inf':''}">${ba.change_pct<0?'+∞%':((ba.change_pct>=0?'+':'')+ba.change_pct+'%')}</div><div class="l">change</div></div>
+      `;
+      card.append(panel);
+    }
+
     if (p.confidence) {
       const conf = el('div','a-confidence');
-      conf.style.marginTop = '0';
+      conf.style.marginTop = '10px';
       conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${p.confidence}%"></div></div><strong>${p.confidence}%</strong>`;
       card.append(conf);
     }
@@ -783,7 +898,7 @@
     // actions
     const acts = el('div');
     acts.style.cssText = 'display:flex;gap:8px;margin-top:14px';
-    const view = el('button','btn primary','View details');
+    const view = el('button','btn primary','Investigate');
     view.onclick = () => showDetails(p.id);
     acts.append(view);
     if (p.deployment_correlated) {
@@ -960,7 +1075,7 @@
   function anomalyCard(a) {
     const card = el('div', `a-card sev-${sevColor(a.severity)}`);
 
-    // Top row: tag + workload path + severity
+    // Top row: tag + urgency + workload path + severity
     const top = el('div','a-top');
     const tagLabel = a.deployment_correlated ? 'NEW ERROR AFTER DEPLOY'
       : a.first_seen_in_version ? 'NEW ERROR TEMPLATE'
@@ -968,35 +1083,49 @@
       : (a.kind === 'restart_rate' ? 'RESTART SPIKE' : 'NEW ANOMALY'));
     const tagCls = a.deployment_correlated ? 'a-tag deploy' : 'a-tag';
     top.append(el('span', tagCls, tagLabel));
+    if (a.urgency) {
+      const urgIcon = ({worsening:'🔴', active:'🟠', new:'🔵', settled:'🟢'})[a.urgency] || '⚫';
+      const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[a.urgency] || a.urgency;
+      top.append(el('span', `urg ${a.urgency}`, `${urgIcon} ${urgLbl}`));
+    }
     const path = el('span','a-path', escapeHTML(wlPath(a.workload)));
     top.append(path);
-    const sev = el('span','a-sev', sevPretty(a.severity));
-    top.append(sev);
+    const sevPill = el('span','a-sev', sevPretty(a.severity));
+    top.append(sevPill);
     card.append(top);
 
-    // Headline + first-seen-in-version badge
-    const headline = el('div','a-headline');
-    headline.innerHTML = (a.deployment_correlated ? '🚨 ' : '⚠️ ') + escapeHTML(a.headline || 'New anomaly');
-    if (a.first_seen_in_version) headline.innerHTML += ' <span class="first-seen">First seen in this version</span>';
-    if (a.variants && a.variants.length) headline.innerHTML += ` <span class="first-seen">+${a.variants.length} variants</span>`;
-    card.append(headline);
-
-    // Story
+    // Three-tier headline (human → technical → raw)
+    const tier1 = el('div','h-tier1');
+    const headIcon = a.deployment_correlated ? '🚨 ' : a.urgency === 'worsening' ? '📈 ' : '⚠️ ';
+    tier1.innerHTML = headIcon + escapeHTML(a.human_headline || a.headline || 'New anomaly');
+    if (a.first_seen_in_version) tier1.innerHTML += ' <span class="first-seen">First seen in this version</span>';
+    if (a.variants && a.variants.length) tier1.innerHTML += ` <span class="first-seen">+${a.variants.length} variants</span>`;
+    card.append(tier1);
+    if (a.technical_headline) {
+      card.append(el('div','h-tier2', escapeHTML(a.technical_headline)));
+    }
     if (a.short_story) card.append(el('div','a-story', escapeHTML(a.short_story)));
 
     // Meta grid: impact + times
     const meta = el('div','a-meta');
     const impact = el('div','a-impact');
-    const blast = blastRadius(a.affected_pods || 1, a.severity);
-    const blastWrap = el('div','row');
-    blastWrap.append(blast);
-    impact.append(blastWrap);
+    // Impact: clear LOW/MEDIUM/HIGH/CRITICAL label first.
+    const impCls = ({low:'low', medium:'med', high:'high', critical:'crit'})[a.impact_level || 'low'] || 'low';
+    const impLabel = ({low:'LOW', medium:'MEDIUM', high:'HIGH', critical:'CRITICAL'})[a.impact_level || 'low'] || 'LOW';
+    const impLine = el('div','row');
+    const lbl = el('span', `imp-label ${impCls}`, `Impact: ${impLabel}`);
+    impLine.append(lbl);
     if (a.impact_line) {
-      const r = el('div','row'); r.innerHTML = `<span>📊</span><span>${escapeHTML(a.impact_line)}</span>`;
-      impact.append(r);
+      impLine.append(el('span', '', ' · ' + escapeHTML(a.impact_line.replace(/^\s*/, ''))));
     }
+    impact.append(impLine);
+    // Blast radius dots — visual reinforcement
+    const blastWrap = el('div','row');
+    blastWrap.append(blastRadius(a.affected_pods || 1, a.severity));
+    impact.append(blastWrap);
     if (a.time_to_detection_seconds) {
-      const r = el('div','row'); r.innerHTML = `<span>⏱️</span><span>Detected ${humSecs(a.time_to_detection_seconds)} after rollout</span>`;
+      const r = el('div','row');
+      r.innerHTML = `<span>⏱️</span><span>Detected ${humSecs(a.time_to_detection_seconds)} after rollout</span>`;
       impact.append(r);
     }
     if (a.image_digest) {
@@ -1007,6 +1136,34 @@
     const times = el('div','a-times', `<div class="ago">${fmtTime(a.fired_at)}</div><div data-fired="${a.fired_at}">${fmtAgo(a.fired_at)}</div>`);
     meta.append(impact, times);
     card.append(meta);
+
+    // Before vs After deployment (only when we have it)
+    if (a.before_after) {
+      const ba = a.before_after;
+      const panel = el('div','ba-panel');
+      const beforeBad = ba.before > 0;
+      const afterBad = ba.after > 0;
+      const beforeCell = el('div','ba-cell');
+      beforeCell.innerHTML = `<div class="l">Before deployment</div><div class="n ${beforeBad?'bad':'ok'}">${ba.before}</div><div class="s">errors of this kind</div>`;
+      const afterCell = el('div','ba-cell');
+      afterCell.innerHTML = `<div class="l">After deployment</div><div class="n ${afterBad?'bad':'ok'}">${ba.after}${ba.after>ba.before?' ↑':''}</div><div class="s">errors of this kind</div>`;
+      const ch = el('div','ba-change');
+      let chTxt;
+      if (ba.change_pct < 0) chTxt = '<div class="v inf">+∞%</div>';
+      else if (ba.before === 0 && ba.after === 0) chTxt = '<div class="v" style="color:var(--ok)">no change</div>';
+      else chTxt = `<div class="v">${ba.change_pct >= 0 ? '+' : ''}${ba.change_pct}%</div>`;
+      ch.innerHTML = chTxt + `<div class="l">change</div>`;
+      panel.append(beforeCell, afterCell, ch);
+      card.append(panel);
+    }
+
+    // What happened narrative
+    if (a.what_happened) {
+      const nar = el('div','narrative');
+      nar.innerHTML = `<h4>What happened</h4>${escapeHTML(a.what_happened)}` +
+        (a.likely_cause ? `<div class="cause"><strong>Likely cause:</strong> ${escapeHTML(a.likely_cause)}</div>` : '');
+      card.append(nar);
+    }
 
     // Timeline
     if (a.timeline && a.timeline.length) {
@@ -1020,11 +1177,17 @@
       card.append(tl);
     }
 
-    // Confidence bar
+    // Confidence bar with explainable factors
     if (a.confidence) {
       const conf = el('div','a-confidence');
-      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${a.confidence}%"></div></div><strong>${a.confidence}%</strong>`;
+      const tip = (a.confidence_factors||[]).join('\n• ');
+      conf.innerHTML = `<span>Confidence <span class="conf-help" title="Confidence is computed from deployment timing, novelty of the error pattern, blast radius, and rate change.${tip ? '\n• '+tip : ''}">?</span></span><div class="bar"><div style="width:${a.confidence}%"></div></div><strong>${a.confidence}%</strong>`;
       card.append(conf);
+      if (a.confidence_factors && a.confidence_factors.length) {
+        const ex = el('div','conf-explain');
+        ex.innerHTML = `Based on:<ul>${a.confidence_factors.map(f => `<li>${escapeHTML(f)}</li>`).join('')}</ul>`;
+        card.append(ex);
+      }
     }
 
     // Chips
@@ -1040,7 +1203,7 @@
 
     // Actions
     const acts = el('div','a-actions');
-    const view = el('button','btn primary','View details');
+    const view = el('button','btn primary','Investigate');
     view.onclick = () => showDetails(a.id);
     acts.append(view);
     if (a.deployment_correlated) {
@@ -1057,19 +1220,22 @@
     acts.append(silence, resolve, ignore);
     card.append(acts);
 
-    // Suggestions (collapsed by default for the card; full in details modal)
+    // Next steps — numbered thinking guide instead of command dump
     if (a.suggestions && a.suggestions.length) {
-      const sug = el('div','a-suggestions');
-      sug.append(el('h4','','Suggested investigation'));
-      a.suggestions.slice(0, 2).forEach(s => {
-        const box = el('div','a-sug');
-        box.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>${s.command?'<code>'+escapeHTML(s.command)+'</code>':''}${s.why?'<div class="why">'+escapeHTML(s.why)+'</div>':''}`;
-        sug.append(box);
+      const steps = el('div','steps');
+      steps.append(el('h4','','Next steps'));
+      a.suggestions.slice(0, 3).forEach((s, i) => {
+        const row = el('div','step');
+        row.append(el('div','step-num', String(i + 1)));
+        const body = el('div','step-body');
+        body.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>${s.command?'<code>'+escapeHTML(s.command)+'</code>':''}${s.why?'<div class="why">'+escapeHTML(s.why)+'</div>':''}`;
+        row.append(body);
+        steps.append(row);
       });
-      if (a.suggestions.length > 2) {
-        sug.append(el('div','why', `+${a.suggestions.length-2} more in details`));
+      if (a.suggestions.length > 3) {
+        steps.append(el('div','why', `+${a.suggestions.length-3} more in details`));
       }
-      card.append(sug);
+      card.append(steps);
     }
 
     return card;

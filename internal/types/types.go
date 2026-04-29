@@ -69,7 +69,17 @@ type Suggestion struct {
 // TimelineEvent is one step in the "what happened, in order" view.
 type TimelineEvent struct {
 	When  time.Time `json:"when"`
-	Label string    `json:"label"` // e.g. "Deployment rolled out", "First error seen"
+	Label string    `json:"label"`
+}
+
+// BeforeAfter is the deploy-impact snapshot. Counts are template/topic
+// matches in a comparable window (default = same length as time-since-
+// rollout, capped at 30 minutes).
+type BeforeAfter struct {
+	WindowSeconds int `json:"window_seconds"` // length of each side
+	Before        int `json:"before"`         // matches in the window before rollout
+	After         int `json:"after"`          // matches in the window after rollout
+	ChangePct     int `json:"change_pct"`     // (after-before)/before*100; -1 sentinel for ∞
 }
 
 // ImpactLevel grades the user-visible blast radius of an anomaly.
@@ -111,15 +121,43 @@ type Anomaly struct {
 	// the workload's current image-digest.
 	FirstSeenInVersion bool `json:"first_seen_in_version,omitempty"`
 
-	// --- human-readable framing ---
+	// --- three-tier headline framing ---
 
-	// Headline is the one-liner shown at the top of the card, e.g.
-	// "User not found errors started 7 min after rollout".
+	// HumanHeadline is the user-facing line a non-technical SRE would
+	// write — the FIRST thing on the card, no template tokens.
+	// e.g. "Errors after deployment in orbiter-auth".
+	HumanHeadline string `json:"human_headline,omitempty"`
+
+	// TechnicalHeadline summarizes the error topic in plain English,
+	// SECOND line. e.g. "/api.lz requests failing".
+	TechnicalHeadline string `json:"technical_headline,omitempty"`
+
+	// Headline (backwards-compat) is the rich one-liner used in places
+	// that haven't adopted the three-tier yet (Slack, CLI).
 	Headline string `json:"headline,omitempty"`
 
-	// ShortStory is the human paragraph: what happened, on which workload,
-	// affecting how many pods. No tech jargon.
+	// ShortStory is one human sentence about scope.
 	ShortStory string `json:"short_story,omitempty"`
+
+	// WhatHappened is the multi-sentence narrative shown in the
+	// incident drill-down. Tells the story: deploy → first error →
+	// trend.
+	WhatHappened string `json:"what_happened,omitempty"`
+
+	// LikelyCause is one short sentence — what we think is wrong.
+	LikelyCause string `json:"likely_cause,omitempty"`
+
+	// Urgency is the dynamic "is this getting worse?" signal.
+	// "new" / "active" / "worsening" / "settled".
+	Urgency string `json:"urgency,omitempty"`
+
+	// ConfidenceFactors lists the inputs that contributed to the score
+	// (shown as bullet list under the bar to make the % explainable).
+	ConfidenceFactors []string `json:"confidence_factors,omitempty"`
+
+	// BeforeAfter is the deploy-impact snapshot: how many error events
+	// of this kind occurred in the window before vs after the rollout.
+	BeforeAfter *BeforeAfter `json:"before_after,omitempty"`
 
 	// RCA is the kept-for-backwards-compat templated sentence with full
 	// technical detail (workload path, image-digest, etc.).

@@ -62,9 +62,11 @@ type Observation struct {
 type Detector struct {
 	mu        sync.Mutex
 	baselines map[types.Workload]*baseline
-	// pod-set per (workload, clusterID) over a 30-min rolling window;
-	// supports AffectedPods bumping.
+	// pod-set per (workload, clusterID) over a 30-min rolling window.
 	pods map[tplKey]map[string]time.Time
+	// hit timestamps per (workload, clusterID) over a 60-min window,
+	// for Before/After computation around rollout times.
+	hits map[tplKey][]time.Time
 	now  func() time.Time
 }
 
@@ -72,6 +74,7 @@ func New() *Detector {
 	return &Detector{
 		baselines: map[types.Workload]*baseline{},
 		pods:      map[tplKey]map[string]time.Time{},
+		hits:      map[tplKey][]time.Time{},
 		now:       time.Now,
 	}
 }
@@ -126,7 +129,7 @@ func (d *Detector) Observe(line types.LogLine) (*types.Anomaly, Observation) {
 	// digest before — it's new in the current rollout.
 	firstSeenInVersion := priorVersionCount == 0 && line.ImageDigest != ""
 
-	// Per-template pod tracking.
+	// Per-template pod tracking + hit timestamps for Before/After.
 	key := tplKey{wl, cluster.ID}
 	pods, ok := d.pods[key]
 	if !ok {
@@ -138,6 +141,10 @@ func (d *Detector) Observe(line types.LogLine) (*types.Anomaly, Observation) {
 	}
 	d.gcPods(key, 30*time.Minute)
 	affectedPods := len(pods)
+
+	// Append hit timestamp; trim to last 60 minutes.
+	d.hits[key] = append(d.hits[key], d.now())
+	d.trimHits(key, 60*time.Minute)
 
 	warmUp := d.now().Sub(b.firstSeen) < MinHistory
 	belowMinLines := b.lines < MinLines
@@ -199,4 +206,53 @@ func (d *Detector) gcPods(key tplKey, retain time.Duration) {
 			delete(pods, p)
 		}
 	}
+}
+
+func (d *Detector) trimHits(key tplKey, retain time.Duration) {
+	cutoff := d.now().Add(-retain)
+	hits := d.hits[key]
+	i := 0
+	for ; i < len(hits); i++ {
+		if !hits[i].Before(cutoff) {
+			break
+		}
+	}
+	if i > 0 {
+		d.hits[key] = hits[i:]
+	}
+}
+
+// HitsAround returns (countBefore, countAfter) hit counts within the
+// given window length on each side of the pivot time. Best-effort —
+// limited to the last 60 minutes of retained data.
+func (d *Detector) HitsAround(w types.Workload, template string, pivot time.Time, window time.Duration) (int, int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for k, hits := range d.hits {
+		if k.w != w {
+			continue
+		}
+		if b, ok := d.baselines[w]; ok {
+			for _, c := range b.miner.Clusters() {
+				if c.ID != k.clID || c.Format() != template {
+					continue
+				}
+				before, after := 0, 0
+				start := pivot.Add(-window)
+				end := pivot.Add(window)
+				for _, t := range hits {
+					if t.Before(start) || t.After(end) {
+						continue
+					}
+					if t.Before(pivot) {
+						before++
+					} else {
+						after++
+					}
+				}
+				return before, after
+			}
+		}
+	}
+	return 0, 0
 }
