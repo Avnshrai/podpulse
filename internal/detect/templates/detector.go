@@ -23,12 +23,17 @@ import (
 	"time"
 
 	"github.com/podpulse/podpulse/internal/detect/drain3"
+	"github.com/podpulse/podpulse/internal/logsev"
 	"github.com/podpulse/podpulse/internal/types"
 )
 
 var (
 	MinHistory = 5 * time.Minute
 	MinLines   = 200
+	// MinSeverity gates which log lines feed Drain3. Default is Warn —
+	// "info" startup chatter and request logs are not anomalies.
+	// Set MinSeverity = logsev.Info to revert to "everything" mode.
+	MinSeverity = logsev.Warn
 )
 
 type tplKey struct {
@@ -84,6 +89,11 @@ func New() *Detector {
 //     gates have passed; nil otherwise.
 //   - an Observation with workload/template even when no anomaly fires,
 //     so callers can update AffectedPods on prior anomalies.
+//
+// Severity gating: a line whose classified severity is below MinSeverity
+// (default Warn) is short-circuited. We don't feed it to Drain3 at all,
+// because info-level chatter is not an anomaly even if it's new — that's
+// just the workload doing its job.
 func (d *Detector) Observe(line types.LogLine) (*types.Anomaly, Observation) {
 	wl := types.Workload{
 		Namespace: line.Namespace,
@@ -92,6 +102,19 @@ func (d *Detector) Observe(line types.LogLine) (*types.Anomaly, Observation) {
 	}
 	if wl.Name == "" {
 		wl.Name = line.Pod
+	}
+
+	// Severity gate (the noise killer). Lines below MinSeverity are
+	// counted but not templated.
+	sev := logsev.Classify(line.Message)
+	if sev != logsev.Unknown && !sev.AtLeast(MinSeverity) {
+		d.mu.Lock()
+		// Still bump "lines observed" so cold-start gate eventually clears.
+		if b, ok := d.baselines[wl]; ok {
+			b.lines++
+		}
+		d.mu.Unlock()
+		return nil, Observation{Workload: wl, ImageDigest: line.ImageDigest}
 	}
 
 	d.mu.Lock()

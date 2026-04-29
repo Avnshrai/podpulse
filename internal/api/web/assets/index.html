@@ -580,6 +580,14 @@
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
       Events
     </a>
+    <a class="nav-item" data-route="audit">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v6H3zM3 15h18v6H3zM7 6h.01M7 18h.01"/></svg>
+      Audit log
+    </a>
+    <a class="nav-item" data-route="users">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Users
+    </a>
     <a class="nav-item" data-route="silences">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
       Silences
@@ -664,6 +672,12 @@
     issueState:   (id, action) => fetch(`/v1/issues/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
     timeline:     q => fetch('/v1/timeline?' + new URLSearchParams(q||{})).then(r => r.json()),
     configChanges:() => fetch('/v1/config-changes').then(r => r.json()),
+    audit:        q => fetch('/v1/audit?' + new URLSearchParams(q||{})).then(r => r.json()),
+    auditActors:  () => fetch('/v1/audit/actors').then(r => r.json()),
+    listUsers:    () => fetch('/v1/users').then(r => r.json()),
+    createUser:   body => fetch('/v1/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
+    deleteUser:   name => fetch('/v1/users/' + encodeURIComponent(name), {method:'DELETE'}),
+    userKubeconfigURL: name => '/v1/users/' + encodeURIComponent(name) + '/kubeconfig',
     workloads:    () => fetch('/v1/workloads').then(r => r.json()),
     services:     () => fetch('/v1/services').then(r => r.json()),
     deployments:  () => fetch('/v1/deployments').then(r => r.json()),
@@ -677,6 +691,8 @@
     overview:    renderOverview,
     issues:      renderIssues,
     changes:     renderChanges,
+    audit:       renderAudit,
+    users:       renderUsers,
     anomalies:   renderAnomalies,
     workloads:   renderWorkloads,
     incidents:   renderIncidents,
@@ -689,6 +705,7 @@
   };
   const titles = {
     overview: 'Overview', issues: 'Issues', changes: 'What changed',
+    audit: 'Audit log', users: 'Users',
     anomalies: 'Anomalies', workloads: 'Workloads',
     incidents: 'Incidents', deployments: 'Deployments', services: 'Services',
     events: 'Events', silences: 'Silences', channels: 'Channels', settings: 'Settings',
@@ -1374,6 +1391,191 @@
     }
     m.append(card);
     renderRail(lastSummary);
+  }
+
+  // -------------- Audit log (who changed what, when) --------------
+  let auditFilter = { only_humans: 'true', since: '6h' };
+
+  async function renderAudit() {
+    const m = $('#main');
+    m.innerHTML = '';
+
+    // Filter row.
+    const fr = el('div'); fr.style.cssText = 'display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap';
+    const onlyHumans = el('label'); onlyHumans.style.cssText='display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px';
+    onlyHumans.innerHTML = `<input type="checkbox" ${auditFilter.only_humans==='true'?'checked':''}> Only show human actors`;
+    onlyHumans.querySelector('input').onchange = e => {
+      auditFilter.only_humans = e.target.checked ? 'true' : '';
+      lastRenderSig = null; rerender(true);
+    };
+    fr.append(onlyHumans);
+    ['1h','6h','24h'].forEach(d => {
+      const b = el('button', 'btn' + (auditFilter.since===d?' primary':''), 'Last ' + d);
+      b.onclick = () => { auditFilter.since = d; lastRenderSig = null; rerender(true); };
+      fr.append(b);
+    });
+    m.append(fr);
+
+    // Actor leaderboard.
+    const actorData = await api.auditActors();
+    if (actorData.actors && actorData.actors.length) {
+      const acts = el('div','pcard');
+      acts.append(el('h3','','👤 Active actors'));
+      const grid = el('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px';
+      actorData.actors.slice(0, 12).forEach(a => {
+        const isUser = a.actor_type === 'User';
+        const card = el('div'); card.style.cssText = `background:var(--panel-2);padding:10px 12px;border-radius:8px;border-left:3px solid ${isUser?'var(--accent)':'var(--muted)'};cursor:pointer`;
+        card.innerHTML = `<div style="font-weight:600;font-size:13px;${isUser?'':'color:var(--muted)'}">${escapeHTML(a.actor)}</div><div style="font-size:11px;color:var(--muted)">${a.actor_type} · ${a.events} events · ${fmtAgo(a.last_seen)}</div>`;
+        card.onclick = () => { auditFilter.actor = a.actor; lastRenderSig = null; rerender(true); };
+        grid.append(card);
+      });
+      acts.append(grid);
+      m.append(acts);
+    }
+
+    // Event list.
+    const data = await api.audit(auditFilter);
+    if (!data.available) {
+      m.append(el('div','empty','Audit watcher not initialized (Kubernetes integration disabled).'));
+      return;
+    }
+    const list = el('div','pcard');
+    list.append(el('h3','',`📋 Mutations${auditFilter.actor?` by ${auditFilter.actor}`:''} <span style="color:var(--muted);font-weight:400">(${data.count})</span>`));
+    if (auditFilter.actor) {
+      const clr = el('button','btn ghost','Clear filter');
+      clr.onclick = () => { delete auditFilter.actor; lastRenderSig = null; rerender(true); };
+      clr.style.marginLeft='10px';
+      list.querySelector('h3').append(clr);
+    }
+    if (!data.events || !data.events.length) {
+      list.append(el('div','empty','No mutations in this window. Either nothing has changed, or PodPulse needs a few seconds to observe a write.'));
+    } else {
+      data.events.forEach(e => {
+        const row = el('div'); row.style.cssText='display:grid;grid-template-columns:88px 80px 60px 1fr 70px;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px;align-items:start';
+        const actCol = ({create:'➕', update:'✏️', delete:'🗑️'})[e.action] || '•';
+        const riskCls = ({high:'high',medium:'medium',info:'low'})[e.risk] || 'low';
+        const fields = (e.fields||[]).join(', ');
+        row.innerHTML = `
+          <div style="color:var(--muted);font-variant-numeric:tabular-nums">${fmtTime(e.when)}</div>
+          <div><strong>${escapeHTML(e.actor)}</strong></div>
+          <div style="font-size:18px">${actCol}</div>
+          <div>
+            <strong>${escapeHTML(e.kind)}/${escapeHTML(e.name)}</strong>
+            <span style="color:var(--muted)">${e.namespace?'in '+escapeHTML(e.namespace):''}</span>
+            ${fields?`<div style="color:var(--muted);font-size:11.5px;margin-top:2px">touched: ${escapeHTML(fields)}</div>`:''}
+          </div>
+          <div style="text-align:right"><span class="imp-label ${riskCls}" style="font-size:10.5px">${(e.risk||'').toUpperCase()}</span></div>
+        `;
+        list.append(row);
+      });
+    }
+    m.append(list);
+    renderRail(lastSummary);
+  }
+
+  // -------------- Users (onboarding + RBAC + kubeconfig) --------------
+  async function renderUsers() {
+    const m = $('#main');
+    const data = await api.listUsers();
+    m.innerHTML = '';
+
+    // Onboard form.
+    const form = el('div','pcard');
+    form.append(el('h3','','➕ Onboard a teammate'));
+    form.append(el('div','sub','Creates a ServiceAccount + Role + RoleBinding scoped to one namespace, then issues a 1-hour kubeconfig your teammate can use immediately.'));
+    const grid = el('div'); grid.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-top:12px;align-items:end';
+    grid.innerHTML = `
+      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Name<input id="u-name" placeholder="alice" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"></label>
+      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Namespace<input id="u-ns" placeholder="dev" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"></label>
+      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Scope<select id="u-scope" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"><option value="viewer">viewer (read-only)</option><option value="developer" selected>developer (no Secret edits)</option><option value="admin">admin (in namespace)</option></select></label>
+      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Description<input id="u-desc" placeholder="optional"  style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"></label>
+      <button class="btn primary" id="u-go">Onboard</button>
+    `;
+    form.append(grid);
+    const scopeHelp = el('div'); scopeHelp.style.cssText='margin-top:8px;font-size:11.5px;color:var(--muted)';
+    scopeHelp.innerHTML = '<strong>viewer</strong>: get/list/watch on workloads + logs · <strong>developer</strong>: + create/update/delete workloads (no Secret edits) · <strong>admin</strong>: full namespaced access. PodPulse never grants cluster-admin via this flow.';
+    form.append(scopeHelp);
+    m.append(form);
+
+    grid.querySelector('#u-go').onclick = async () => {
+      const body = {
+        name: grid.querySelector('#u-name').value.trim(),
+        namespace: grid.querySelector('#u-ns').value.trim(),
+        scope: grid.querySelector('#u-scope').value,
+        description: grid.querySelector('#u-desc').value.trim(),
+      };
+      if (!body.name || !body.namespace) { toast('Name and namespace are required'); return; }
+      try {
+        const u = await api.createUser(body);
+        toast('Onboarded ' + u.name);
+        showKubeconfigModal(u);
+        rerender(true);
+      } catch (e) { toast('Failed: ' + e.message); }
+    };
+
+    // Existing users.
+    const list = el('div','pcard');
+    list.append(el('h3','','👥 Onboarded users'));
+    if (!data.users || !data.users.length) {
+      list.append(el('div','empty','No users onboarded yet. Use the form above to add one.'));
+    } else {
+      data.users.forEach(u => {
+        const row = el('div'); row.style.cssText='display:grid;grid-template-columns:1fr 120px 130px 200px auto;gap:12px;padding:10px 0;border-bottom:1px dashed var(--border);align-items:center';
+        const scopeCls = u.scope==='admin'?'crit':u.scope==='developer'?'med':'low';
+        row.innerHTML = `
+          <div>
+            <div style="font-weight:600">${escapeHTML(u.name)}</div>
+            <div style="color:var(--muted);font-size:11.5px">${escapeHTML(u.description||'no description')}</div>
+          </div>
+          <div style="color:var(--muted);font-size:13px">${escapeHTML(u.namespace)}</div>
+          <div><span class="imp-label ${scopeCls}">${escapeHTML((u.scope||'').toUpperCase())}</span></div>
+          <div style="color:var(--muted);font-size:11.5px;font-family:ui-monospace,monospace">SA: ${escapeHTML(u.service_account||'')}</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn primary" data-act="kube">kubeconfig</button>
+            <button class="btn" data-act="del">remove</button>
+          </div>
+        `;
+        row.querySelector('[data-act=kube]').onclick = () => showKubeconfigModal(u);
+        row.querySelector('[data-act=del]').onclick = async () => {
+          if (!confirm(`Remove ${u.name}? This deletes the SA, Role, and RoleBinding.`)) return;
+          await api.deleteUser(u.name);
+          toast('Removed ' + u.name);
+          rerender(true);
+        };
+        list.append(row);
+      });
+    }
+    m.append(list);
+    renderRail(lastSummary);
+  }
+
+  function showKubeconfigModal(u) {
+    const url = api.userKubeconfigURL(u.name) + '?ttl=3600';
+    const shade = el('div','modal-shade');
+    const m = el('div','modal');
+    m.style.cssText='max-width:680px;width:100%';
+    m.innerHTML = `
+      <h3>kubeconfig for ${escapeHTML(u.name)}</h3>
+      <div class="rec-reason">A kubeconfig with a 1-hour token is generated on demand. Click to download or fetch it directly.</div>
+      <div style="background:var(--panel-2);border-radius:8px;padding:14px;margin-top:12px;font-size:13px;line-height:1.6">
+        <div><strong>Namespace:</strong> ${escapeHTML(u.namespace)}</div>
+        <div><strong>Scope:</strong> ${escapeHTML(u.scope||'')}</div>
+        <div><strong>ServiceAccount:</strong> ${escapeHTML(u.service_account||'')}</div>
+        <div><strong>Role:</strong> ${escapeHTML(u.role||'')}</div>
+      </div>
+      <div style="margin-top:14px">
+        <strong style="font-size:12px;color:var(--muted)">QUICK USE</strong>
+        <div class="cmd">curl -o ${escapeHTML(u.name)}.kubeconfig http://&lt;podpulse-host&gt;${url}\nKUBECONFIG=${escapeHTML(u.name)}.kubeconfig kubectl get pods -n ${escapeHTML(u.namespace)}</div>
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="${url}" download="${escapeHTML(u.name)}.kubeconfig">Download kubeconfig</a>
+        <button class="btn ghost" id="kc-close">Close</button>
+      </div>
+    `;
+    shade.append(m);
+    shade.onclick = e => { if (e.target === shade) shade.remove(); };
+    document.body.append(shade);
+    m.querySelector('#kc-close').onclick = () => shade.remove();
   }
 
   // -------------- Anomalies (legacy view, kept) --------------

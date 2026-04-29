@@ -37,6 +37,7 @@ import (
 	"github.com/podpulse/podpulse/internal/rca"
 	"github.com/podpulse/podpulse/internal/redact"
 	"github.com/podpulse/podpulse/internal/types"
+	"github.com/podpulse/podpulse/internal/users"
 )
 
 type Server struct {
@@ -47,6 +48,8 @@ type Server struct {
 	k8sCache      *ppk8s.Cache
 	configWatcher *ppk8s.ConfigWatcher
 	eventWatcher  *ppk8s.EventWatcher
+	auditWatcher  *ppk8s.AuditWatcher
+	userManager   *users.Manager
 	issueEngine   *issue.Engine
 	channels      []string
 	startedAt     time.Time
@@ -60,6 +63,8 @@ type Options struct {
 	K8sCache      *ppk8s.Cache
 	ConfigWatcher *ppk8s.ConfigWatcher
 	EventWatcher  *ppk8s.EventWatcher
+	AuditWatcher  *ppk8s.AuditWatcher
+	UserManager   *users.Manager
 	IssueEngine   *issue.Engine
 	Channels      []string
 }
@@ -73,6 +78,8 @@ func NewServer(opts Options) *Server {
 		k8sCache:      opts.K8sCache,
 		configWatcher: opts.ConfigWatcher,
 		eventWatcher:  opts.EventWatcher,
+		auditWatcher:  opts.AuditWatcher,
+		userManager:   opts.UserManager,
 		issueEngine:   opts.IssueEngine,
 		channels:      opts.Channels,
 		startedAt:     time.Now(),
@@ -106,6 +113,14 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/issues/{id}/ignore", s.handleIssueState("ignored"))
 	mux.HandleFunc("GET /v1/timeline", s.handleTimeline)
 	mux.HandleFunc("GET /v1/config-changes", s.handleConfigChanges)
+
+	// Audit + onboarded users.
+	mux.HandleFunc("GET /v1/audit", s.handleAudit)
+	mux.HandleFunc("GET /v1/audit/actors", s.handleAuditActors)
+	mux.HandleFunc("GET /v1/users", s.handleListUsers)
+	mux.HandleFunc("POST /v1/users", s.handleCreateUser)
+	mux.HandleFunc("DELETE /v1/users/{name}", s.handleDeleteUser)
+	mux.HandleFunc("GET /v1/users/{name}/kubeconfig", s.handleUserKubeconfig)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -971,4 +986,120 @@ func confidenceForDeploy(d deploymentView, all []*anomaly.Stored) int {
 		}
 	}
 	return 70
+}
+
+// --- Audit ---
+
+func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
+	if s.auditWatcher == nil {
+		writeJSON(w, map[string]any{"events": []ppk8s.AuditEvent{}, "count": 0, "available": false})
+		return
+	}
+	q := r.URL.Query()
+	f := ppk8s.AuditFilter{
+		Limit:      300,
+		Actor:      q.Get("actor"),
+		Namespace:  q.Get("namespace"),
+		Kind:       q.Get("kind"),
+		Action:     ppk8s.AuditAction(q.Get("action")),
+		OnlyHumans: q.Get("only_humans") == "true",
+	}
+	if v := q.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			f.Limit = n
+		}
+	}
+	if v := q.Get("since"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			f.Since = time.Now().Add(-d)
+		}
+	}
+	events := s.auditWatcher.Query(f)
+	writeJSON(w, map[string]any{"events": events, "count": len(events), "available": true})
+}
+
+func (s *Server) handleAuditActors(w http.ResponseWriter, _ *http.Request) {
+	if s.auditWatcher == nil {
+		writeJSON(w, map[string]any{"actors": []ppk8s.ActorStat{}, "count": 0})
+		return
+	}
+	a := s.auditWatcher.Actors()
+	writeJSON(w, map[string]any{"actors": a, "count": len(a)})
+}
+
+// --- Onboarded users ---
+
+func (s *Server) handleListUsers(w http.ResponseWriter, _ *http.Request) {
+	if s.userManager == nil {
+		writeJSON(w, map[string]any{"users": []users.User{}, "count": 0, "available": false})
+		return
+	}
+	list := s.userManager.List()
+	writeJSON(w, map[string]any{"users": list, "count": len(list), "available": true})
+}
+
+type createUserReq struct {
+	Name        string      `json:"name"`
+	Namespace   string      `json:"namespace"`
+	Scope       users.Scope `json:"scope"`
+	Description string      `json:"description"`
+}
+
+func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
+	if s.userManager == nil {
+		http.Error(w, "user manager unavailable (k8s integration disabled)", http.StatusServiceUnavailable)
+		return
+	}
+	var body createUserReq
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&body); err != nil {
+		http.Error(w, "bad body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	u := users.User{
+		Name:        body.Name,
+		Namespace:   body.Namespace,
+		Scope:       body.Scope,
+		Description: body.Description,
+	}
+	created, err := s.userManager.Onboard(r.Context(), u)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, created)
+}
+
+func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
+	if s.userManager == nil {
+		http.Error(w, "user manager unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	name := r.PathValue("name")
+	if err := s.userManager.Remove(r.Context(), name); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleUserKubeconfig(w http.ResponseWriter, r *http.Request) {
+	if s.userManager == nil {
+		http.Error(w, "user manager unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	name := r.PathValue("name")
+	ttl := int64(3600)
+	if v := r.URL.Query().Get("ttl"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 && n <= 24*3600 {
+			ttl = n
+		}
+	}
+	cfg, err := s.userManager.Kubeconfig(r.Context(), name, ttl)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.kubeconfig"`)
+	_, _ = io.WriteString(w, cfg)
 }

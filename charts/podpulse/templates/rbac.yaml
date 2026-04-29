@@ -33,6 +33,17 @@ rules:
     resources:
       - events
     verbs: ["get", "list", "watch"]
+  # User-onboarding writes (creates ServiceAccount + Role + RoleBinding,
+  # mints short-lived tokens via TokenRequest).
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    verbs: ["create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
 {{- if .Values.gitops.argocd }}
   - apiGroups: ["argoproj.io"]
     resources:

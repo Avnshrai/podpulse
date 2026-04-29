@@ -25,6 +25,7 @@ import (
 	"github.com/podpulse/podpulse/internal/detect/templates"
 	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
+	"github.com/podpulse/podpulse/internal/users"
 )
 
 func main() {
@@ -68,6 +69,8 @@ func main() {
 	var k8sCache *ppk8s.Cache
 	var configWatcher *ppk8s.ConfigWatcher
 	var eventWatcher *ppk8s.EventWatcher
+	var auditWatcher *ppk8s.AuditWatcher
+	var userMgr *users.Manager
 	if *k8sEnabled {
 		client, err := ppk8s.NewClient(*kubeconfig)
 		if err != nil {
@@ -77,6 +80,11 @@ func main() {
 			k8sCache = ppk8s.NewCache(logger)
 			configWatcher = ppk8s.NewConfigWatcher(k8sCache, logger)
 			eventWatcher = ppk8s.NewEventWatcher(logger)
+			auditWatcher = ppk8s.NewAuditWatcher(logger)
+			// API server URL for kubeconfig generation. Use the
+			// in-cluster kubernetes.default service so the kubeconfig
+			// works for any user inside this cluster.
+			userMgr = users.NewManager(client, "https://kubernetes.default.svc")
 			go func() {
 				if err := k8sCache.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
 					slog.Error("pod/rs/svc informer loop exited", "err", err)
@@ -92,7 +100,12 @@ func main() {
 					slog.Error("event watcher exited", "err", err)
 				}
 			}()
-			slog.Info("kubernetes integration enabled (pods, replicasets, services, configmaps, secrets, events)")
+			go func() {
+				if err := auditWatcher.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
+					slog.Error("audit watcher exited", "err", err)
+				}
+			}()
+			slog.Info("kubernetes integration enabled (pods, rs, svc, configmaps, secrets, events, audit, users)")
 		}
 	}
 
@@ -107,6 +120,8 @@ func main() {
 		K8sCache:      k8sCache,
 		ConfigWatcher: configWatcher,
 		EventWatcher:  eventWatcher,
+		AuditWatcher:  auditWatcher,
+		UserManager:   userMgr,
 		IssueEngine:   issueEngine,
 		Channels:      channels,
 	})
