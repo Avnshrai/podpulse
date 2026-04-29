@@ -714,6 +714,11 @@
   let activeRoute = 'issues';
   let activeSeverity = ''; // empty = all
   let showLow = false;     // collapse low-severity in the anomalies list by default
+
+  // Pages with form inputs / interactive state — these should ONLY
+  // render on navigation, never on the polling tick (otherwise the
+  // user's typing disappears every 5 seconds).
+  const staticPages = new Set(['users', 'settings', 'channels', 'audit']);
   $$('.nav-item').forEach(n => n.addEventListener('click', e => {
     e.preventDefault();
     const r = n.dataset.route;
@@ -761,6 +766,12 @@
       $('#topbar-time').textContent = 'detector unreachable';
       return;
     }
+    // Static-form routes (Users, Settings, Channels, Audit log)
+    // never re-render on the polling tick — that would destroy any
+    // half-typed input. They only render when the user navigates to
+    // them or when an action button explicitly triggers it.
+    if (staticPages.has(activeRoute)) return;
+
     // Only redraw if the meaningful state changed.
     const sig = activeRoute + '|' + activeSeverity + '|' + summarySig(lastSummary);
     if (sig !== lastRenderSig) {
