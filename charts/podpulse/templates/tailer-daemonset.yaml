@@ -50,7 +50,7 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: DETECTOR_URL
-              value: "http://{{ include "podpulse.fullname" . }}-detector.{{ .Release.Namespace }}.svc:{{ .Values.detector.service.httpPort }}"
+              value: "https://{{ include "podpulse.fullname" . }}-detector.{{ .Release.Namespace }}.svc:{{ .Values.detector.service.httpPort }}"
           resources:
             {{- toYaml .Values.tailer.resources | nindent 12 }}
           {{- if not .Values.tailer.demo }}

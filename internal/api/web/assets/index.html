@@ -1575,8 +1575,13 @@
         <div><strong>Role:</strong> ${escapeHTML(u.role||'')}</div>
       </div>
       <div style="margin-top:14px">
-        <strong style="font-size:12px;color:var(--muted)">QUICK USE</strong>
-        <div class="cmd">curl -o ${escapeHTML(u.name)}.kubeconfig http://&lt;podpulse-host&gt;${url}\nKUBECONFIG=${escapeHTML(u.name)}.kubeconfig kubectl get pods -n ${escapeHTML(u.namespace)}</div>
+        <strong style="font-size:12px;color:var(--muted)">QUICK USE (this kubeconfig points at PodPulse — kubectl traffic is proxied to the cluster)</strong>
+        <div class="cmd">curl -o ${escapeHTML(u.name)}.kubeconfig ${location.origin}${url}
+export KUBECONFIG=$(pwd)/${escapeHTML(u.name)}.kubeconfig
+kubectl get pods -n ${escapeHTML(u.namespace)}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">
+          Make sure your tunnel / DNS resolves <code>${location.host}</code> from wherever kubectl runs. For the local SSH-tunnel setup, that's just <code>localhost:8080</code> — the same way you reach this dashboard.
+        </div>
       </div>
       <div class="actions">
         <a class="btn primary" href="${url}" download="${escapeHTML(u.name)}.kubeconfig">Download kubeconfig</a>

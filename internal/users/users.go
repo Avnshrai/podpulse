@@ -60,7 +60,14 @@ type Manager struct {
 	mu     sync.RWMutex
 	cs     kubernetes.Interface
 	users  map[string]User // name → user
-	server string          // K8s api-server URL for kubeconfig
+	server string          // apiserver URL injected into kubeconfigs
+
+	// InsecureTLS makes generated kubeconfigs skip TLS verification.
+	// Required when the user reaches PodPulse via plain HTTP (e.g. an
+	// SSH tunnel to localhost:8080) — kubectl otherwise refuses an
+	// http:// server URL. Set false in production with TLS termination
+	// via Ingress + cert-manager.
+	InsecureTLS bool
 }
 
 func NewManager(cs kubernetes.Interface, apiServer string) *Manager {
@@ -197,10 +204,6 @@ func (m *Manager) Kubeconfig(ctx context.Context, name string, ttlSeconds int64)
 	if ttlSeconds <= 0 {
 		ttlSeconds = 3600
 	}
-	clusterCA, err := m.clusterCA(ctx)
-	if err != nil {
-		return "", err
-	}
 
 	// TokenRequest is the modern way (since 1.22) to mint short-lived
 	// SA tokens.
@@ -211,6 +214,16 @@ func (m *Manager) Kubeconfig(ctx context.Context, name string, ttlSeconds int64)
 		return "", fmt.Errorf("create token: %w", err)
 	}
 
+	// If the kubeconfig points at PodPulse over plain HTTP (the typical
+	// SSH-tunnel case), emit insecure-skip-tls-verify and omit the CA.
+	// Otherwise embed the cluster CA the apiserver presents.
+	if m.InsecureTLS {
+		return renderKubeconfigInsecure(u, m.server, tr.Status.Token), nil
+	}
+	clusterCA, err := m.clusterCA(ctx)
+	if err != nil {
+		return "", err
+	}
 	return renderKubeconfig(u, m.server, clusterCA, tr.Status.Token), nil
 }
 
@@ -280,6 +293,35 @@ users:
   user:
     token: %s
 `, cluster, server, caB64,
+		contextName, cluster, u.Namespace, u.Name,
+		contextName, u.Name, token)
+}
+
+// renderKubeconfigInsecure: same shape but with TLS verification
+// disabled, for use when the user reaches PodPulse via http:// or a
+// self-signed cert. kubectl otherwise refuses anything but TLS.
+func renderKubeconfigInsecure(u User, server, token string) string {
+	cluster := "podpulse-cluster"
+	contextName := u.Name + "@" + cluster
+	return fmt.Sprintf(`apiVersion: v1
+kind: Config
+clusters:
+- name: %s
+  cluster:
+    server: %s
+    insecure-skip-tls-verify: true
+contexts:
+- name: %s
+  context:
+    cluster: %s
+    namespace: %s
+    user: %s
+current-context: %s
+users:
+- name: %s
+  user:
+    token: %s
+`, cluster, server,
 		contextName, cluster, u.Namespace, u.Name,
 		contextName, u.Name, token)
 }

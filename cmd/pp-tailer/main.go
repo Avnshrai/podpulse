@@ -13,6 +13,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -234,6 +235,19 @@ func runDemo(ctx context.Context, detectorURL, node, ns, workload string, breakA
 	}
 }
 
+// httpClient skips TLS verification on the in-cluster detector
+// connection. The detector serves a self-signed cert that the tailer
+// pod can't easily fetch (it's regenerated on every detector restart),
+// so we accept the cert without validation. The connection is still
+// pod-to-pod via the cluster service network — same trust boundary as
+// any other in-cluster service call.
+var httpClient = &http.Client{
+	Timeout: 5 * time.Second,
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
+}
+
 func postBatch(ctx context.Context, base string, lines []types.LogLine) error {
 	body, err := json.Marshal(map[string]any{"lines": lines})
 	if err != nil {
@@ -246,8 +260,7 @@ func postBatch(ctx context.Context, base string, lines []types.LogLine) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}

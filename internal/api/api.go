@@ -40,6 +40,11 @@ import (
 	"github.com/podpulse/podpulse/internal/users"
 )
 
+// K8sAPIProxy is set by the detector main when in-cluster proxy is
+// available; the api package mounts it under /k8s/* so kubectl can
+// reach the apiserver through PodPulse.
+var K8sAPIProxy http.Handler
+
 type Server struct {
 	store         *anomaly.Store
 	detector      *templates.Detector
@@ -126,6 +131,16 @@ func (s *Server) Routes() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "ok\n")
 	})
+	// kubectl-compatible reverse proxy to the in-cluster apiserver.
+	// Register per-method to keep Go 1.22 ServeMux's strict-pattern
+	// rules happy (it rejects mixing method-specific and method-
+	// agnostic patterns at the same path level).
+	if K8sAPIProxy != nil {
+		for _, m := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"} {
+			mux.Handle(m+" /k8s/", K8sAPIProxy)
+		}
+	}
+
 	if s.webFS != nil {
 		// no-cache the SPA so browsers don't pin old HTML/JS after a
 		// detector image upgrade.

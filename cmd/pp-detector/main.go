@@ -9,11 +9,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,8 +27,16 @@ import (
 	"github.com/podpulse/podpulse/internal/detect/templates"
 	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
+	"github.com/podpulse/podpulse/internal/proxy"
 	"github.com/podpulse/podpulse/internal/users"
 )
+
+func env(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
 
 func main() {
 	var (
@@ -41,6 +51,12 @@ func main() {
 		k8sEnabled = flag.Bool("k8s", true,
 			"Enable Kubernetes informer integration (set to false to run standalone)")
 		resync = flag.Duration("k8s-resync", 5*time.Minute, "Informer resync period")
+		externalURL = flag.String("external-url", env("PODPULSE_EXTERNAL_URL", "https://localhost:8080"),
+			"Public URL where users reach PodPulse (used in generated kubeconfigs as the apiserver URL)")
+		kubeconfigInsecure = flag.Bool("kubeconfig-insecure", true,
+			"Generate kubeconfigs with insecure-skip-tls-verify (for tunnel/localhost use). Set false in prod with a real TLS cert.")
+		tlsEnabled = flag.Bool("tls", true,
+			"Serve TLS with an in-memory self-signed cert. Required: kubectl strips bearer tokens on plain HTTP.")
 	)
 	flag.Parse()
 
@@ -81,10 +97,35 @@ func main() {
 			configWatcher = ppk8s.NewConfigWatcher(k8sCache, logger)
 			eventWatcher = ppk8s.NewEventWatcher(logger)
 			auditWatcher = ppk8s.NewAuditWatcher(logger)
-			// API server URL for kubeconfig generation. Use the
-			// in-cluster kubernetes.default service so the kubeconfig
-			// works for any user inside this cluster.
-			userMgr = users.NewManager(client, "https://kubernetes.default.svc")
+
+			// In-cluster apiserver URL. Used both as the proxy upstream
+			// and as the literal "kubernetes.default.svc" fallback for
+			// kubeconfigs when no --external-url is set.
+			apiUpstream := "https://kubernetes.default.svc"
+
+			// Mount the kubectl-compatible reverse proxy so
+			// kubeconfigs that point at PodPulse work transparently.
+			ph, perr := proxy.New(proxy.Config{
+				Upstream:      apiUpstream,
+				StripPrefix:   "/k8s",
+				CABundle:      proxy.LoadInClusterCA(),
+				AllowInsecure: proxy.LoadInClusterCA() == nil, // dev-only fallback
+			})
+			if perr != nil {
+				slog.Warn("k8s proxy disabled", "err", perr)
+			} else {
+				api.K8sAPIProxy = ph
+				slog.Info("k8s api proxy mounted at /k8s", "upstream", apiUpstream)
+			}
+
+			// User-facing apiserver URL used in generated kubeconfigs.
+			// Defaults to the PodPulse external URL + /k8s so kubectl
+			// reaches the apiserver through PodPulse.
+			kubeconfigServer := strings.TrimRight(*externalURL, "/") + "/k8s"
+			userMgr = users.NewManager(client, kubeconfigServer)
+			userMgr.InsecureTLS = *kubeconfigInsecure
+			slog.Info("kubeconfig generator configured",
+				"server", kubeconfigServer, "insecure_skip_tls", *kubeconfigInsecure)
 			go func() {
 				if err := k8sCache.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
 					slog.Error("pod/rs/svc informer loop exited", "err", err)
@@ -133,7 +174,26 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("pp-detector listening",
+		if *tlsEnabled {
+			cert, err := proxy.SelfSignedCert("podpulse")
+			if err != nil {
+				slog.Error("could not generate self-signed cert", "err", err)
+				cancel()
+				return
+			}
+			httpSrv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+			slog.Info("pp-detector listening (TLS, self-signed)",
+				"https", *httpAddr,
+				"min_history", minHistory.String(),
+				"k8s", k8sCache != nil,
+			)
+			if err := httpSrv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				slog.Error("https server stopped", "err", err)
+				cancel()
+			}
+			return
+		}
+		slog.Info("pp-detector listening (PLAIN HTTP — kubectl will not work)",
 			"http", *httpAddr,
 			"min_history", minHistory.String(),
 			"k8s", k8sCache != nil,
