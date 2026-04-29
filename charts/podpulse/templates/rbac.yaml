@@ -43,7 +43,12 @@ rules:
     verbs: ["create"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
-    verbs: ["get", "list", "watch", "create", "update", "delete"]
+    # 'escalate' + 'bind' are required by K8s privilege-escalation guards
+    # so PodPulse can create Roles granting verbs it does not itself
+    # hold cluster-wide. Without these, the apiserver rejects role
+    # creation with: "attempting to grant RBAC permissions not currently
+    # held". Standard pattern for RBAC-management tools.
+    verbs: ["get", "list", "watch", "create", "update", "delete", "escalate", "bind"]
 {{- if .Values.gitops.argocd }}
   - apiGroups: ["argoproj.io"]
     resources:
