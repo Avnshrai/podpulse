@@ -5,539 +5,583 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PodPulse</title>
 <style>
+  /* ============================================================
+     PodPulse — minimalist UI
+     Single accent. No gradients. No emoji chrome. Tight type.
+     ============================================================ */
   :root {
-    --bg: #0b0d12;
-    --panel: #141821;
-    --panel-2: #1a1f2b;
-    --panel-3: #232938;
-    --border: #232938;
-    --text: #e6e8ee;
-    --muted: #8a93a6;
-    --accent: #4cc2ff;
-    --accent-2: #6c5ce7;
-    --low:      #69d199;
-    --medium:   #f7c548;
-    --high:     #ff8a3d;
-    --critical: #ff4d6d;
-    --ok:       #69d199;
-    --warn:     #ff8a3d;
+    --bg:       #0a0a0b;
+    --panel:    #111114;
+    --panel-2:  #17171a;
+    --border:   #1f1f23;
+    --border-2: #2a2a30;
+    --text:     #ededee;
+    --muted:    #8a8a93;
+    --muted-2:  #5a5a63;
+    --accent:   #5b9dff;
+
+    /* Severity tones — only used as small dots / thin left-borders. */
+    --low:      #4ade80;
+    --medium:   #facc15;
+    --high:     #fb923c;
+    --critical: #f87171;
+
+    --radius: 6px;
+    --gap: 14px;
   }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
-    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
     background: var(--bg);
     color: var(--text);
     overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   a { color: inherit; text-decoration: none; }
   button { font: inherit; color: inherit; cursor: pointer; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-  /* App grid */
+  /* ---- Layout ---- */
   .app {
     display: grid;
-    grid-template-columns: 240px 1fr 320px;
-    grid-template-rows: 60px 1fr;
+    grid-template-columns: 220px 1fr 300px;
+    grid-template-rows: 52px 1fr;
     grid-template-areas:
       "side topbar topbar"
       "side main rail";
     height: 100vh;
   }
 
-  /* Sidebar */
+  /* ---- Sidebar ---- */
   .side {
     grid-area: side;
-    background: linear-gradient(180deg, #0e1119 0%, #0b0d12 100%);
+    background: var(--panel);
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
-    padding: 18px 12px;
-    gap: 4px;
+    padding: 14px 10px;
   }
   .brand {
     display: flex; align-items: center; gap: 10px;
-    padding: 0 8px 18px;
+    padding: 4px 8px 14px;
     margin-bottom: 6px;
-    border-bottom: 1px solid var(--border);
   }
   .brand .pulse-dot {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--accent) 0%, transparent 60%);
-    position: relative;
-  }
-  .brand .pulse-dot::after {
-    content: ''; position: absolute; inset: 8px;
+    width: 8px; height: 8px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 0 0 rgba(76, 194, 255, .55);
-    animation: pulse 1.6s ease-out infinite;
+    flex: 0 0 auto;
   }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(76, 194, 255, .55); }
-    70% { box-shadow: 0 0 0 10px rgba(76, 194, 255, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(76, 194, 255, 0); }
-  }
-  .brand .name { font-weight: 600; font-size: 16px; }
+  .brand .name { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
 
   .nav-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 9px 10px;
-    border-radius: 8px;
+    padding: 6px 8px;
+    border-radius: 5px;
     color: var(--muted);
+    font-size: 13px;
     cursor: pointer;
-    transition: background .15s, color .15s;
+    margin-bottom: 1px;
   }
-  .nav-item:hover { background: var(--panel); color: var(--text); }
-  .nav-item.active { background: var(--panel); color: var(--accent); }
-  .nav-item .ic { width: 18px; height: 18px; opacity: .9; }
+  .nav-item:hover { color: var(--text); background: var(--panel-2); }
+  .nav-item.active { color: var(--text); background: var(--panel-2); }
+  .nav-item .ic { width: 14px; height: 14px; opacity: .7; }
+  .nav-item.active .ic { opacity: 1; }
   .nav-item .badge {
     margin-left: auto;
-    background: var(--panel-3);
-    color: var(--text);
+    color: var(--muted-2);
     font-size: 11px;
-    padding: 1px 7px;
-    border-radius: 10px;
-    min-width: 20px; text-align: center;
+    font-variant-numeric: tabular-nums;
   }
+  .nav-item.active .badge { color: var(--muted); }
+
   .side-foot {
     margin-top: auto;
-    padding-top: 14px;
+    padding-top: 12px;
     border-top: 1px solid var(--border);
     color: var(--muted);
-    font-size: 12px;
+    font-size: 11.5px;
   }
-  .storage-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin-bottom: 10px;
+  .storage-card { padding: 8px; margin-bottom: 6px; }
+  .storage-card .row1 { display: flex; align-items: center; gap: 6px; color: var(--low); font-size: 11px; }
+  .storage-card .row2 { color: var(--text); font-size: 12px; margin-top: 2px; }
+  .storage-card .row3 { color: var(--muted-2); font-size: 11px; }
+  .user-card { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
+  .avatar {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    display: grid; place-items: center;
+    font-weight: 600; font-size: 11px;
+    color: var(--text);
   }
-  .storage-card .row1 { display: flex; align-items: center; gap: 8px; color: var(--ok); font-size: 12px; }
-  .storage-card .row2 { color: var(--text); font-size: 12px; margin-top: 4px; }
-  .storage-card .row3 { color: var(--muted); font-size: 11px; margin-top: 2px; }
-  .user-card {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px;
-  }
-  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-2); display: grid; place-items: center; font-weight: 600; font-size: 12px; }
-  .user-card .name { font-size: 13px; color: var(--text); }
-  .user-card .role { font-size: 11px; color: var(--muted); }
+  .user-card .name { font-size: 12.5px; color: var(--text); }
+  .user-card .role { font-size: 11px; color: var(--muted-2); }
 
-  /* Topbar */
+  /* ---- Topbar ---- */
   .topbar {
     grid-area: topbar;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center;
     padding: 0 22px;
-    gap: 16px;
-    background: rgba(11,13,18,.85);
-    backdrop-filter: blur(8px);
+    gap: 14px;
+    background: var(--bg);
   }
-  .topbar h1 { margin: 0; font-size: 17px; font-weight: 600; }
-  .topbar .meta { margin-left: auto; display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: 13px; }
-  .bell { position: relative; padding: 6px; cursor: pointer; }
+  .topbar h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar .meta {
+    margin-left: auto; display: flex; align-items: center; gap: 16px;
+    color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums;
+  }
+  .bell { position: relative; padding: 4px; cursor: pointer; color: var(--muted); }
+  .bell:hover { color: var(--text); }
   .bell .count {
     position: absolute; top: -2px; right: -2px;
     background: var(--critical); color: white;
-    border-radius: 10px;
-    font-size: 10px;
+    border-radius: 8px;
+    font-size: 9px;
     padding: 1px 5px;
-    min-width: 18px; text-align: center;
+    min-width: 14px; text-align: center;
   }
 
-  /* Main */
+  /* ---- Main ---- */
   .main {
     grid-area: main;
     overflow-y: auto;
-    padding: 22px 28px 60px;
+    padding: 20px 28px 60px;
   }
 
-  /* Right rail */
+  /* ---- Right rail ---- */
   .rail {
     grid-area: rail;
-    background: var(--bg);
     border-left: 1px solid var(--border);
     overflow-y: auto;
     padding: 18px 18px 60px;
+    background: var(--bg);
   }
   .rail .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0;
   }
-  .rail .card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text); }
-  .rail .card .sub { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+  .rail .card:first-child { padding-top: 0; }
+  .rail .card:last-child { border-bottom: 0; }
+  .rail .card h3 {
+    margin: 0 0 8px; font-size: 11px; font-weight: 500;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  }
+  .rail .card .sub {
+    font-size: 11px; color: var(--muted-2); margin-bottom: 10px;
+  }
 
-  /* Severity tabs */
-  .tabs { display: flex; align-items: center; gap: 22px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 18px; }
-  .tab { color: var(--muted); cursor: pointer; padding-bottom: 4px; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 7px; }
-  .tab.active { color: var(--text); border-color: var(--accent); }
-  .tab .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .tab .num { background: var(--panel-2); border-radius: 10px; padding: 1px 8px; font-size: 12px; color: var(--text); }
+  /* ---- Severity tabs ---- */
+  .tabs {
+    display: flex; align-items: center; gap: 18px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px; margin-bottom: 18px;
+  }
+  .tab {
+    color: var(--muted); cursor: pointer;
+    padding-bottom: 8px;
+    margin-bottom: -10px;
+    border-bottom: 1px solid transparent;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-color: var(--text); }
+  .tab .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .tab .num {
+    color: var(--muted-2); font-size: 11.5px; font-variant-numeric: tabular-nums;
+  }
+  .tab.active .num { color: var(--muted); }
   .tab.crit .dot { background: var(--critical); }
   .tab.high .dot { background: var(--high); }
   .tab.med  .dot { background: var(--medium); }
   .tab.low  .dot { background: var(--low); }
 
-  /* Right cluster — filters + time range */
   .filters-row {
-    display: flex; align-items: center; gap: 12px; justify-content: flex-end;
+    display: flex; align-items: center; gap: 8px; justify-content: flex-end;
     margin-top: -54px; margin-bottom: 18px;
   }
   .pill {
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 8px; padding: 7px 12px; color: var(--text); font-size: 13px;
-    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; border: 1px solid var(--border-2);
+    border-radius: var(--radius); padding: 5px 10px;
+    color: var(--muted); font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer;
   }
-  .pill.primary { background: var(--accent-2); border-color: var(--accent-2); }
-  .pill svg { width: 14px; height: 14px; opacity: .8; }
+  .pill:hover { color: var(--text); border-color: var(--muted-2); }
+  .pill.primary {
+    background: var(--text); border-color: var(--text); color: var(--bg);
+  }
+  .pill svg { width: 12px; height: 12px; opacity: .8; }
 
-  /* Anomaly card */
+  /* ---- Issue / Anomaly card ---- */
   .a-card {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-left: 4px solid var(--medium);
-    border-radius: 10px;
+    border-radius: var(--radius);
     padding: 16px 18px;
-    margin-bottom: 14px;
-    animation: slideIn .35s ease;
+    margin-bottom: 10px;
   }
-  .a-card.sev-low      { border-left-color: var(--low); }
-  .a-card.sev-medium   { border-left-color: var(--medium); }
-  .a-card.sev-high     { border-left-color: var(--high); }
-  .a-card.sev-critical { border-left-color: var(--critical); }
-  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  /* Severity is conveyed by a small left dot — no full bars, no gradients. */
+  .a-card.sev-low      { border-left: 2px solid var(--low); }
+  .a-card.sev-medium   { border-left: 2px solid var(--medium); }
+  .a-card.sev-high     { border-left: 2px solid var(--high); }
+  .a-card.sev-critical { border-left: 2px solid var(--critical); }
 
-  .a-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .a-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
   .a-tag {
-    background: rgba(247,197,72,.14); color: var(--medium);
-    padding: 2px 8px; border-radius: 4px;
-    font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase;
+    color: var(--muted); font-size: 10.5px; letter-spacing: .04em;
+    text-transform: uppercase; font-weight: 500;
   }
-  .a-tag.crit  { background: rgba(255,77,109,.14); color: var(--critical); }
-  .a-tag.high  { background: rgba(255,138,61,.14); color: var(--high); }
-  .a-tag.low   { background: rgba(105,209,153,.14); color: var(--low); }
-  .a-tag.deploy { background: rgba(76,194,255,.14); color: var(--accent); }
-
-  .a-path { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-  .a-path .copy { margin-left: 6px; opacity: .5; cursor: pointer; }
+  .a-path {
+    color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px;
+  }
   .a-sev {
-    margin-left: auto;
-    background: var(--panel-2);
-    color: var(--medium);
-    text-transform: uppercase; font-size: 10.5px; letter-spacing: .8px;
-    padding: 3px 10px; border-radius: 12px; font-weight: 600;
+    margin-left: auto; color: var(--muted); font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .04em; font-weight: 500;
   }
-  .sev-medium .a-sev { color: var(--medium); }
+  .sev-low      .a-sev { color: var(--low); }
+  .sev-medium   .a-sev { color: var(--medium); }
   .sev-high     .a-sev { color: var(--high); }
   .sev-critical .a-sev { color: var(--critical); }
-  .sev-low      .a-sev { color: var(--low); }
-
-  .a-headline { font-size: 16px; font-weight: 600; margin: 6px 0 4px; }
-  .a-headline .first-seen {
-    margin-left: 8px;
-    background: rgba(108,92,231,.18);
-    color: #b9aef7;
-    font-size: 11px;
-    padding: 2px 8px; border-radius: 10px;
-    font-weight: 500;
-  }
-  .a-story { color: var(--text); margin-bottom: 6px; }
-  .a-story .impact { color: var(--muted); }
-  .a-story .impact.high { color: var(--high); }
-  .a-story .impact.critical { color: var(--critical); }
-
-  .a-meta { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; margin-top: 8px; }
-  .a-impact { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12.5px; }
-  .a-impact .row { display: flex; align-items: center; gap: 6px; }
-  .a-times { color: var(--muted); font-size: 12px; text-align: right; }
-  .a-times .ago { color: var(--text); }
-
-  .a-timeline {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    background: var(--panel-2); border-radius: 6px;
-    padding: 8px 10px; margin-top: 12px; font-size: 12px; color: var(--muted);
-  }
-  .a-timeline .step { display: inline-flex; align-items: center; gap: 6px; }
-  .a-timeline .step strong { color: var(--text); font-weight: 500; }
-  .a-timeline .arrow { color: var(--border); }
-
-  .a-confidence { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
-  .a-confidence .bar { flex: 1; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
-  .a-confidence .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-
-  .a-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
-  .a-chip { background: var(--panel-2); border-radius: 5px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 5px; }
-  .a-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); font-size: 11.5px; }
-  .a-chip.variants { background: rgba(108,92,231,.12); color: #b9aef7; }
-
-  .a-actions { display: flex; gap: 8px; margin-top: 14px; }
-  .btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 6px; font-size: 12.5px; }
-  .btn:hover { background: var(--panel-3); }
-  .btn.primary { background: var(--accent-2); border-color: var(--accent-2); color: white; }
-  .btn.primary:hover { filter: brightness(1.05); }
-  .btn.ghost { background: transparent; }
-
-  .a-suggestions { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px; }
-  .a-suggestions h4 { font-size: 12px; color: var(--muted); margin: 0 0 8px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
-  .a-sug { background: var(--panel-2); border-radius: 6px; padding: 9px 10px; margin-bottom: 6px; }
-  .a-sug .t { font-size: 13px; font-weight: 500; }
-  .a-sug code { display: block; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ok); white-space: pre-wrap; word-break: break-all; }
-  .a-sug .why { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
-
-  /* Generic cards / lists / table */
-  .pcard {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 12px;
-  }
-  .pcard h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
-  .row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--border); }
-  .row:last-child { border-bottom: 0; }
-  .row .name { font-size: 13px; }
-  .row .meta { color: var(--muted); font-size: 12px; }
-  .row .num { background: var(--panel-2); border-radius: 5px; padding: 2px 8px; font-size: 12px; }
-
-  /* Sparkline + severity totals (rail) */
-  .sev-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-  .sev-cell { background: var(--panel-2); border-radius: 6px; padding: 8px 10px; text-align: left; }
-  .sev-cell .n { font-size: 18px; font-weight: 600; }
-  .sev-cell .l { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
-  .sev-cell.crit .n { color: var(--critical); }
-  .sev-cell.high .n { color: var(--high); }
-  .sev-cell.med  .n { color: var(--medium); }
-  .sev-cell.low  .n { color: var(--low); }
-  .sev-cell.crit .l, .sev-cell.high .l, .sev-cell.med .l, .sev-cell.low .l { color: inherit; opacity: .7; }
-
-  .total-line { display: flex; align-items: end; gap: 12px; }
-  .total-line .big { font-size: 36px; font-weight: 700; line-height: 1; }
-  .total-line .lbl { color: var(--muted); font-size: 12px; padding-bottom: 2px; }
-
-  /* Empty / loading */
-  .empty { padding: 60px 0; text-align: center; color: var(--muted); }
-  .empty .pulse-dot { display: block; width: 32px; height: 32px; margin: 0 auto 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(76,194,255,.55); animation: pulse 1.6s ease-out infinite; }
-
-  /* --- Overview page --- */
-  .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .hero {
-    grid-column: 1 / -1;
-    background: linear-gradient(135deg, rgba(255,77,109,.12), rgba(108,92,231,.10));
-    border: 1px solid var(--border);
-    border-left: 5px solid var(--high);
-    border-radius: 14px;
-    padding: 22px 24px;
-  }
-  .hero.crit { border-left-color: var(--critical); }
-  .hero.med  { border-left-color: var(--medium); }
-  .hero.low  { border-left-color: var(--low); }
-  .hero.calm { border-left-color: var(--ok); background: linear-gradient(135deg, rgba(105,209,153,.06), rgba(76,194,255,.04)); }
-  .hero h2 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
-  .hero .lede { color: var(--muted); margin-bottom: 14px; }
-  .hero .row1 { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; }
-  .hero .meta-line { color: var(--muted); font-size: 13px; }
-  .hero .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-
-  .stat-row {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
-    margin: 12px 0 6px;
-  }
-  .stat-cell {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-  }
-  .stat-cell .n { font-size: 28px; font-weight: 700; }
-  .stat-cell .l { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .stat-cell.crit .n { color: var(--critical); }
-  .stat-cell.high .n { color: var(--high); }
-  .stat-cell.warn .n { color: var(--medium); }
-  .stat-cell.ok   .n { color: var(--ok); }
-
-  .deploy-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-  }
-  .deploy-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px dashed var(--border);
-  }
-  .deploy-row:last-child { border-bottom: 0; }
-  .deploy-row .dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    flex: 0 0 auto;
-  }
-  .deploy-row .dot.bad { background: var(--high); box-shadow: 0 0 8px rgba(255,138,61,.6); }
-  .deploy-row .dot.ok  { background: var(--ok); }
-  .deploy-row .body { flex: 1; min-width: 0; }
-  .deploy-row .name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .deploy-row .sub { font-size: 11.5px; color: var(--muted); }
-  .deploy-row .badge { font-size: 11px; padding: 3px 9px; border-radius: 12px; flex: 0 0 auto; }
-  .deploy-row .badge.bad { background: rgba(255,138,61,.14); color: var(--high); }
-  .deploy-row .badge.ok  { background: rgba(105,209,153,.12); color: var(--ok); }
-
-  .rec-card {
-    background: linear-gradient(135deg, rgba(76,194,255,.08), rgba(108,92,231,.06));
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-  }
-  .rec-card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-  .rec-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-  .rec-reason { color: var(--muted); margin-bottom: 10px; font-size: 13px; }
-
-  /* Blast-radius dots */
-  .blast { display: inline-flex; gap: 4px; align-items: center; }
-  .blast .b { width: 8px; height: 8px; border-radius: 50%; background: var(--panel-3); }
-  .blast .b.on { background: var(--high); }
-  .blast.crit .b.on { background: var(--critical); }
-  .blast.med  .b.on { background: var(--medium); }
-  .blast.low  .b.on { background: var(--low); }
-
-  /* Collapsed-low banner */
-  .low-fold {
-    background: var(--panel-2);
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
-    color: var(--muted);
-    font-size: 13px;
-    cursor: pointer;
-    margin-bottom: 14px;
-    text-align: center;
-  }
-  .low-fold:hover { background: var(--panel-3); }
 
   /* Three-tier headline */
-  .h-tier1 { font-size: 19px; font-weight: 700; letter-spacing: .2px; }
-  .h-tier2 { color: var(--muted); margin-top: 2px; font-size: 14px; }
-  .h-tier3 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--muted); margin-top: 6px; word-break: break-all; opacity: .7; }
+  .h-tier1 { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.4; }
+  .h-tier2 { color: var(--muted); margin-top: 2px; font-size: 13px; }
+  .h-tier3 {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+    color: var(--muted-2); margin-top: 4px; word-break: break-all;
+  }
 
-  /* Urgency pill */
-  .urg { font-size: 10.5px; padding: 3px 9px; border-radius: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
-  .urg.new       { background: rgba(76,194,255,.14); color: var(--accent); }
-  .urg.active    { background: rgba(255,138,61,.14); color: var(--high); }
-  .urg.worsening { background: rgba(255,77,109,.14); color: var(--critical); }
-  .urg.settled   { background: rgba(105,209,153,.12); color: var(--ok); }
+  /* Urgency — small text label only, no chip background */
+  .urg { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; font-weight: 500; }
+  .urg.new       { color: var(--accent); }
+  .urg.active    { color: var(--high); }
+  .urg.worsening { color: var(--critical); }
+  .urg.settled   { color: var(--low); }
 
-  /* Impact label */
-  .imp-label { font-size: 12.5px; font-weight: 600; }
+  /* Impact label — single colored word, not a chip */
+  .imp-label {
+    font-size: 11.5px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase;
+  }
   .imp-label.low  { color: var(--low); }
   .imp-label.med  { color: var(--medium); }
   .imp-label.high { color: var(--high); }
   .imp-label.crit { color: var(--critical); }
 
-  /* Confidence factors list */
-  .conf-explain { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
-  .conf-explain ul { margin: 4px 0 0 0; padding-left: 16px; }
-  .conf-explain li { margin: 2px 0; }
+  .a-story { color: var(--muted); margin-top: 10px; font-size: 12.5px; }
+
+  .a-meta {
+    display: grid; grid-template-columns: 1fr auto; gap: 18px;
+    align-items: flex-start; margin-top: 12px;
+  }
+  .a-impact { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; }
+  .a-impact .row { display: flex; align-items: center; gap: 6px; }
+  .a-times { color: var(--muted-2); font-size: 11.5px; text-align: right; line-height: 1.5; }
+  .a-times .ago { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .a-timeline {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-top: 12px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    font-size: 11.5px; color: var(--muted-2);
+  }
+  .a-timeline .step { display: inline-flex; align-items: center; gap: 6px; }
+  .a-timeline .step strong { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .a-timeline .arrow { color: var(--border-2); }
+
+  .a-confidence {
+    display: flex; align-items: center; gap: 10px; margin-top: 12px;
+    font-size: 11.5px; color: var(--muted);
+  }
+  .a-confidence .bar { flex: 1; height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; }
+  .a-confidence .bar > div { height: 100%; background: var(--accent); }
+  .a-confidence strong { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
+
+  .conf-explain { margin-top: 4px; font-size: 11px; color: var(--muted-2); }
+  .conf-explain ul { margin: 2px 0 0; padding-left: 14px; }
+  .conf-explain li { margin: 1px 0; }
   .conf-help {
-    margin-left: 8px; cursor: help;
-    color: var(--muted); border: 1px solid var(--border);
-    border-radius: 50%; width: 14px; height: 14px;
+    margin-left: 6px; cursor: help; color: var(--muted-2);
+    border: 1px solid var(--border-2); border-radius: 50%;
+    width: 12px; height: 12px;
     display: inline-flex; align-items: center; justify-content: center;
-    font-size: 10px;
+    font-size: 9px;
   }
 
-  /* Before/after panel */
-  .ba-panel {
-    display: grid; grid-template-columns: 1fr 1fr auto;
-    gap: 14px; margin-top: 14px;
-    background: var(--panel-2); border: 1px solid var(--border);
-    border-radius: 8px; padding: 12px 14px;
-  }
-  .ba-cell .l { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-  .ba-cell .n { font-size: 22px; font-weight: 700; }
-  .ba-cell .n.bad { color: var(--high); }
-  .ba-cell .n.ok { color: var(--ok); }
-  .ba-cell .s { font-size: 11.5px; color: var(--muted); }
-  .ba-change { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
-  .ba-change .v { font-size: 18px; font-weight: 700; color: var(--critical); }
-  .ba-change .v.inf { font-size: 22px; }
-  .ba-change .l { font-size: 10.5px; color: var(--muted); }
+  .a-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--muted-2); }
+  .a-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: 11px; }
 
-  /* What-happened narrative */
-  .narrative {
-    background: var(--panel-2);
-    border-left: 3px solid var(--accent);
-    border-radius: 6px;
-    padding: 12px 14px;
-    margin-top: 14px;
-    color: var(--text);
-    font-size: 13.5px;
-    line-height: 1.55;
+  .first-seen {
+    margin-left: 6px; color: var(--accent); font-size: 11px;
+    font-weight: 400;
   }
-  .narrative h4 { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 500; }
-  .cause { color: var(--medium); margin-top: 6px; font-size: 13px; }
+
+  /* Buttons */
+  .a-actions { display: flex; gap: 6px; margin-top: 14px; }
+  .btn {
+    background: transparent; border: 1px solid var(--border-2);
+    color: var(--muted); padding: 5px 11px; border-radius: var(--radius);
+    font-size: 12px;
+  }
+  .btn:hover { color: var(--text); border-color: var(--muted-2); }
+  .btn.primary {
+    background: var(--text); border-color: var(--text); color: var(--bg);
+  }
+  .btn.primary:hover { background: #fff; border-color: #fff; }
+  .btn.ghost { border-color: transparent; }
+  .btn.ghost:hover { background: var(--panel-2); border-color: transparent; }
 
   /* Numbered next-steps */
-  .steps { margin-top: 12px; }
-  .steps h4 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
+  .steps { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .steps h4 {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted-2); font-weight: 500; margin: 0 0 8px;
+  }
   .step {
-    display: grid; grid-template-columns: 28px 1fr; gap: 10px;
+    display: grid; grid-template-columns: 20px 1fr; gap: 10px;
     margin-bottom: 8px; align-items: start;
   }
   .step-num {
-    width: 24px; height: 24px;
+    width: 18px; height: 18px;
     border-radius: 50%;
     background: var(--panel-2);
-    color: var(--accent);
-    font-size: 12px; font-weight: 600;
+    color: var(--muted);
+    font-size: 11px; font-weight: 500;
     display: grid; place-items: center;
-    border: 1px solid var(--border);
   }
-  .step-body { font-size: 13.5px; }
+  .step-body { font-size: 12.5px; }
   .step-body .t { font-weight: 500; }
   .step-body code {
     display: block;
-    background: #0a0c11;
+    background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 7px 10px;
+    border-radius: 4px;
+    padding: 6px 9px;
     margin-top: 4px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    color: var(--ok);
+    font-size: 11.5px;
+    color: var(--text);
     word-break: break-all;
   }
-  .step-body .why { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .step-body .why { font-size: 11.5px; color: var(--muted-2); margin-top: 3px; }
 
-  /* Modal (rollback command) */
-  .modal-shade { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 60; display: grid; place-items: center; padding: 30px; }
-  .modal {
-    background: var(--panel);
+  /* Generic cards / lists / tables */
+  .pcard {
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 22px 24px;
-    max-width: 640px; width: 100%;
-    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    background: var(--panel);
   }
-  .modal h3 { margin: 0 0 8px; }
-  .modal .cmd { background: #0a0c11; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--ok); margin: 12px 0; word-break: break-all; }
-  .modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .pcard h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+  .pcard h3 + .sub, .pcard .sub { font-size: 11.5px; color: var(--muted-2); margin-bottom: 10px; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 0; border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row .name { font-size: 12.5px; }
+  .row .meta { color: var(--muted); font-size: 11.5px; }
+  .row .num { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+  /* Severity totals — flat, gridded */
+  .sev-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 10px; background: var(--border); }
+  .sev-cell { background: var(--panel); padding: 8px 10px; }
+  .sev-cell .n { font-size: 16px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .sev-cell .l { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-2); margin-top: 2px; }
+  .sev-cell.crit .n { color: var(--critical); }
+  .sev-cell.high .n { color: var(--high); }
+  .sev-cell.med  .n { color: var(--medium); }
+  .sev-cell.low  .n { color: var(--low); }
+
+  .total-line { display: flex; align-items: baseline; gap: 10px; }
+  .total-line .big { font-size: 28px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .total-line .lbl { color: var(--muted); font-size: 11.5px; }
 
   /* Tables */
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  th { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  th {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted-2); font-weight: 500;
+  }
+  td { color: var(--muted); }
+  td strong { color: var(--text); font-weight: 500; }
 
   /* Severity dot helper */
-  .sevdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 5px; }
+  .sevdot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
   .sevdot.critical { background: var(--critical); }
   .sevdot.high { background: var(--high); }
   .sevdot.medium { background: var(--medium); }
   .sevdot.low { background: var(--low); }
 
+  /* ---- Overview hero / stat row / panels ---- */
+  .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hero {
+    grid-column: 1 / -1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    background: var(--panel);
+  }
+  .hero.crit { border-left: 2px solid var(--critical); }
+  .hero.high { border-left: 2px solid var(--high); }
+  .hero.med  { border-left: 2px solid var(--medium); }
+  .hero.low  { border-left: 2px solid var(--low); }
+  .hero.calm { border-left: 2px solid var(--low); }
+  .hero h2 { margin: 0 0 4px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .hero .lede { color: var(--muted); margin-bottom: 0; font-size: 12.5px; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0 0; }
+  .stat-cell {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    background: var(--panel);
+  }
+  .stat-cell .n { font-size: 22px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .stat-cell .l { font-size: 11px; color: var(--muted-2); margin-top: 2px; text-transform: uppercase; letter-spacing: .05em; }
+  .stat-cell.crit .n { color: var(--critical); }
+  .stat-cell.high .n { color: var(--high); }
+  .stat-cell.warn .n { color: var(--medium); }
+  .stat-cell.ok   .n { color: var(--low); }
+
+  .deploy-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; background: var(--panel); }
+  .deploy-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .deploy-row:last-child { border-bottom: 0; }
+  .deploy-row .dot {
+    width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto;
+  }
+  .deploy-row .dot.bad { background: var(--high); }
+  .deploy-row .dot.ok  { background: var(--low); }
+  .deploy-row .body { flex: 1; min-width: 0; }
+  .deploy-row .name {
+    font-weight: 500; font-size: 12.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .deploy-row .sub { font-size: 11px; color: var(--muted-2); }
+  .deploy-row .badge { font-size: 11px; flex: 0 0 auto; }
+  .deploy-row .badge.bad { color: var(--high); }
+  .deploy-row .badge.ok  { color: var(--low); }
+
+  .rec-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    background: var(--panel);
+  }
+  .rec-card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+  .rec-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .rec-reason { color: var(--muted); margin-bottom: 10px; font-size: 12px; }
+
+  /* Blast-radius dots */
+  .blast { display: inline-flex; gap: 3px; align-items: center; }
+  .blast .b { width: 6px; height: 6px; border-radius: 50%; background: var(--border-2); }
+  .blast .b.on { background: var(--high); }
+  .blast.crit .b.on { background: var(--critical); }
+  .blast.med  .b.on { background: var(--medium); }
+  .blast.low  .b.on { background: var(--low); }
+
+  /* Collapsed-low fold */
+  .low-fold {
+    border: 1px dashed var(--border-2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    color: var(--muted-2);
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .low-fold:hover { color: var(--muted); }
+
+  /* Before/after panel — inline, flat */
+  .ba-panel {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 16px; margin-top: 12px;
+    padding: 12px 0; border-top: 1px solid var(--border);
+  }
+  .ba-cell .l { font-size: 10.5px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .05em; }
+  .ba-cell .n {
+    font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+  }
+  .ba-cell .n.bad { color: var(--high); }
+  .ba-cell .n.ok { color: var(--low); }
+  .ba-cell .s { font-size: 11px; color: var(--muted-2); margin-top: 2px; }
+  .ba-change { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
+  .ba-change .v { font-size: 16px; font-weight: 600; color: var(--high); font-variant-numeric: tabular-nums; }
+  .ba-change .l { font-size: 10.5px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* Narrative box */
+  .narrative {
+    background: transparent;
+    border-top: 1px solid var(--border);
+    padding: 12px 0 0;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .narrative h4 {
+    margin: 0 0 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted-2); font-weight: 500;
+  }
+  .cause { color: var(--text); margin-top: 6px; font-size: 12.5px; }
+
+  /* Empty states */
+  .empty { padding: 60px 0; text-align: center; color: var(--muted-2); font-size: 12.5px; }
+  .empty .pulse-dot {
+    display: block; width: 8px; height: 8px;
+    margin: 0 auto 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: .8;
+  }
+
+  /* Modal */
+  .modal-shade { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60; display: grid; place-items: center; padding: 24px; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    max-width: 640px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .modal .cmd {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--text);
+    margin: 12px 0;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
   /* Toast */
-  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.4); animation: slideIn .25s; }
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--panel); border: 1px solid var(--border-2);
+    padding: 8px 14px; border-radius: var(--radius);
+    font-size: 12.5px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
 </style>
 </head>
 <body>
@@ -822,7 +866,7 @@
 
     // 5. Trends sparkline.
     const trend = el('div','pcard');
-    trend.append(el('h3','','📊 Anomaly trend (last 6 hours)'));
+    trend.append(el('h3','','Anomaly trend'));
     trend.append(sparkline(sum.sparkline));
     m.append(trend);
 
@@ -835,17 +879,17 @@
     const primary = sum.primary_incident;
 
     let cls = 'hero calm';
-    let h2 = '✅ All clear';
+    let h2 = 'All clear';
     let lede = `No active incidents in the last 6 hours.`;
     if (primary) {
       const sev = primary.severity || 'medium';
-      cls = 'hero ' + (sev === 'critical' ? 'crit' : sev === 'medium' ? 'med' : sev === 'low' ? 'low' : '');
+      cls = 'hero ' + (sev === 'critical' ? 'crit' : sev === 'high' ? 'high' : sev === 'medium' ? 'med' : sev === 'low' ? 'low' : '');
       const incCount = high > 0 ? high : 1;
-      h2 = `🚨 ${incCount} active ${incCount === 1 ? 'incident' : 'incidents'} need attention`;
-      lede = `${active} active anomalies · ${high} high-risk · ${sum.low_count || 0} low-impact (collapsed)`;
+      h2 = `${incCount} active ${incCount === 1 ? 'incident' : 'incidents'}`;
+      lede = `${active} active · ${high} high-risk · ${sum.low_count || 0} low-impact`;
     } else if (sum.total > 0) {
       cls = 'hero low';
-      h2 = `⚠ ${sum.total} anomalies — none critical`;
+      h2 = `${sum.total} anomalies, none critical`;
       lede = `Most are low-impact. Review the list when you have time.`;
     }
     const hero = el('div', cls);
@@ -874,7 +918,7 @@
     card.style.borderLeft = '4px solid var(--high)';
     const p = sum.primary_incident;
     if (!p) {
-      card.append(el('h3','','🚨 Primary incident'));
+      card.append(el('h3','','Primary incident'));
       card.append(el('div','empty','No active incident — cluster looks calm.'));
       return card;
     }
@@ -882,17 +926,16 @@
     card.style.borderLeftColor = `var(--${sev})`;
     const headRow = el('div');
     headRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:8px';
-    headRow.append(el('h3','','🚨 Primary incident'));
+    headRow.append(el('h3','','Primary incident'));
     if (p.urgency) {
-      const urgIcon = ({worsening:'🔴', active:'🟠', new:'🔵', settled:'🟢'})[p.urgency] || '⚫';
       const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[p.urgency] || p.urgency;
-      headRow.append(el('span', `urg ${p.urgency}`, `${urgIcon} ${urgLbl}`));
+      headRow.append(el('span', `urg ${p.urgency}`, urgLbl));
     }
     card.append(headRow);
 
     // Three-tier headline
     const tier1 = el('div','h-tier1');
-    tier1.innerHTML = (p.deployment_correlated ? '🚨 ' : '⚠️ ') + escapeHTML(p.human_headline || p.headline || 'Anomaly');
+    tier1.innerHTML = escapeHTML(p.human_headline || p.headline || 'Anomaly');
     card.append(tier1);
     if (p.technical_headline) card.append(el('div','h-tier2', escapeHTML(p.technical_headline)));
 
@@ -913,7 +956,7 @@
     const impLabel = ({low:'LOW', medium:'MEDIUM', high:'HIGH', critical:'CRITICAL'})[p.impact_level || 'low'] || 'LOW';
     stats.append(el('span', `imp-label ${impCls}`, `Impact: ${impLabel}`));
     stats.append(blastRadius(p.affected_pods, sev));
-    if (p.time_to_detection_seconds) stats.append(el('span','',`⏱️ Detected ${humSecs(p.time_to_detection_seconds)} after rollout`));
+    if (p.time_to_detection_seconds) stats.append(el('span','',`Detected ${humSecs(p.time_to_detection_seconds)} after rollout`));
     card.append(stats);
 
     // Before vs After mini-panel
@@ -955,7 +998,7 @@
 
   function deploymentImpactCard(sum) {
     const card = el('div','deploy-card');
-    card.append(el('h3','','🚀 Deployment impact'));
+    card.append(el('h3','','Deployment impact'));
     card.append(el('div','sub','Last 24 hours · did this deploy break something?'));
     const list = sum.recent_deployments || [];
     if (!list.length) {
@@ -969,7 +1012,7 @@
       const body = el('div','body');
       body.innerHTML = `<div class="name">${escapeHTML(d.workload.name)}</div><div class="sub">${fmtTime(d.when)}${d.commit?` · ${escapeHTML(d.commit.slice(0,7))}`:''} · ${escapeHTML(d.workload.namespace)}</div>`;
       const badge = el('div', `badge ${bad?'bad':'ok'}`,
-        bad ? `❌ Caused ${d.caused_anomalies} ${d.caused_anomalies===1?'anomaly':'anomalies'}` : '✅ Healthy');
+        bad ? `Caused ${d.caused_anomalies} ${d.caused_anomalies===1?'anomaly':'anomalies'}` : 'Healthy');
       row.append(dot, body, badge);
       card.append(row);
     });
@@ -978,7 +1021,7 @@
 
   function recommendationCard(rec) {
     const card = el('div','rec-card');
-    card.append(el('h3','','💡 Recommended action'));
+    card.append(el('h3','','Recommended action'));
     card.append(el('div','rec-title', escapeHTML(rec.title || 'Investigate')));
     card.append(el('div','rec-reason', escapeHTML(rec.reason || '')));
     if (rec.confidence) {
@@ -1102,27 +1145,23 @@
 
     // Top row: type tag + urgency + workload path + severity
     const top = el('div','a-top');
-    const typeIcons = {
-      log_anomaly:  '📈 LOG ANOMALY',
-      config_issue: '⚙️ CONFIG ISSUE',
-      crash_loop:   '🔁 CRASH LOOP',
-      scheduling:   '🚧 SCHEDULING',
+    const typeLabels = {
+      log_anomaly:  'LOG ANOMALY',
+      config_issue: 'CONFIG ISSUE',
+      crash_loop:   'CRASH LOOP',
+      scheduling:   'SCHEDULING',
     };
-    const typeCls = iss.type === 'config_issue' ? 'a-tag' :
-                    iss.type === 'crash_loop' ? 'a-tag crit' :
-                    iss.type === 'scheduling' ? 'a-tag high' : 'a-tag';
-    top.append(el('span', typeCls, typeIcons[iss.type] || iss.type.toUpperCase()));
+    top.append(el('span', 'a-tag', typeLabels[iss.type] || iss.type.toUpperCase()));
     if (iss.urgency) {
-      const urgIcon = ({worsening:'🔴', active:'🟠', new:'🔵', settled:'🟢'})[iss.urgency] || '⚫';
       const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[iss.urgency] || iss.urgency;
-      top.append(el('span', `urg ${iss.urgency}`, `${urgIcon} ${urgLbl}`));
+      top.append(el('span', `urg ${iss.urgency}`, urgLbl));
     }
     top.append(el('span','a-path', escapeHTML(wlPath(iss.workload))));
     top.append(el('span','a-sev', sevPretty(iss.severity)));
     card.append(top);
 
-    // Headlines (3-tier-ish: human → technical → workload)
-    card.append(el('div','h-tier1', '🚨 ' + escapeHTML(iss.human_headline || 'Issue')));
+    // Headlines (3-tier: human → technical → raw)
+    card.append(el('div','h-tier1', escapeHTML(iss.human_headline || 'Issue')));
     if (iss.technical_headline) card.append(el('div','h-tier2', escapeHTML(iss.technical_headline)));
     if (iss.short_story) card.append(el('div','a-story', escapeHTML(iss.short_story)));
 
@@ -1174,9 +1213,8 @@
       const tl = el('div','a-timeline');
       iss.timeline.forEach((step, i) => {
         if (i > 0) tl.append(el('span','arrow','→'));
-        const icon = ({deploy:'🚀', config_change:'⚙️', error_observed:'⚠️', event:'⚡'})[step.kind] || '•';
         const s = el('span','step');
-        s.innerHTML = `<strong>${fmtTime(step.when)}</strong> ${icon} ${escapeHTML(step.label)}`;
+        s.innerHTML = `<strong>${fmtTime(step.when)}</strong> ${escapeHTML(step.label)}`;
         tl.append(s);
       });
       card.append(tl);
@@ -1227,8 +1265,7 @@
     let body = `<div class="l">Changes detected</div>`;
     body += '<div style="margin-top:6px;font-size:13px;line-height:1.6">';
     (c.changes||[]).forEach(ch => {
-      const icon = ({malformed_json:'❌', became_empty:'⚠️', removed:'🗑️', value_changed:'✏️', from_empty:'✓', added:'➕'})[ch.type] || '•';
-      let line = `${icon} <code style="color:var(--accent);font-family:ui-monospace,monospace">${escapeHTML(ch.key)}</code>`;
+      let line = `<code style="color:var(--accent);font-family:ui-monospace,monospace">${escapeHTML(ch.key)}</code>`;
       if (ch.type === 'value_changed' && (ch.old_value || ch.new_value)) {
         line += ` <span style="color:var(--muted)">"${escapeHTML(ch.old_value||'')}" → "${escapeHTML(ch.new_value||'')}"</span>`;
       } else if (ch.type === 'became_empty') {
@@ -1309,13 +1346,13 @@
       const m = el('div','modal');
       m.style.cssText = 'max-width:780px;width:100%;max-height:85vh;overflow-y:auto;padding:24px';
       m.innerHTML = `
-        <h3 style="margin:0 0 6px;font-size:20px">🚨 ${escapeHTML(iss.human_headline||'Issue')}</h3>
-        ${iss.technical_headline ? `<div style="color:var(--muted);margin-bottom:12px">${escapeHTML(iss.technical_headline)}</div>`:''}
+        <h3 style="margin:0 0 6px;font-size:16px">${escapeHTML(iss.human_headline||'Issue')}</h3>
+        ${iss.technical_headline ? `<div style="color:var(--muted);margin-bottom:12px;font-size:12.5px">${escapeHTML(iss.technical_headline)}</div>`:''}
       `;
       // Root cause section
       if (iss.likely_cause) {
         const rc = el('div','rec-card');
-        rc.innerHTML = `<h3>🎯 Likely cause</h3><div>${escapeHTML(iss.likely_cause)}</div>`;
+        rc.innerHTML = `<h3>Likely cause</h3><div style="color:var(--muted);font-size:12.5px">${escapeHTML(iss.likely_cause)}</div>`;
         m.append(rc);
       }
       // What happened
@@ -1330,11 +1367,10 @@
         const tlBox = el('div'); tlBox.style.marginTop = '16px';
         tlBox.innerHTML = `<h4 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 8px">What changed (timeline)</h4>`;
         const list = el('div');
-        list.style.cssText = 'background:var(--panel-2);border-radius:6px;padding:10px 12px';
+        list.style.cssText = 'border:1px solid var(--border);border-radius:4px;padding:10px 12px';
         iss.timeline.forEach((step, i) => {
-          const icon = ({deploy:'🚀', config_change:'⚙️', error_observed:'⚠️', event:'⚡', issue:'🚨'})[step.kind] || '•';
-          const row = el('div'); row.style.cssText='display:grid;grid-template-columns:60px auto 1fr;gap:8px;padding:5px 0;font-size:13px';
-          row.innerHTML = `<div style="color:var(--muted);font-variant-numeric:tabular-nums">${fmtTime(step.when)}</div><div>${icon}</div><div><strong>${escapeHTML(step.label)}</strong>${step.detail?` <span style="color:var(--muted)">— ${escapeHTML(step.detail)}</span>`:''}</div>`;
+          const row = el('div'); row.style.cssText='display:grid;grid-template-columns:60px 1fr;gap:10px;padding:4px 0;font-size:12.5px';
+          row.innerHTML = `<div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(step.when)}</div><div><strong style="font-weight:500">${escapeHTML(step.label)}</strong>${step.detail?` <span style="color:var(--muted-2)">— ${escapeHTML(step.detail)}</span>`:''}</div>`;
           list.append(row);
         });
         tlBox.append(list);
@@ -1380,21 +1416,20 @@
     const m = $('#main');
     m.innerHTML = '';
     const card = el('div','pcard');
-    card.append(el('h3','','📜 What changed in the last 6 hours'));
-    card.append(el('div', '', '<div style="color:var(--muted);font-size:12.5px;margin-bottom:10px">Deploys, configmap/secret edits, and observed issues — chronological. The single most useful debugging view.</div>'));
+    card.append(el('h3','','What changed in the last 6 hours'));
+    card.append(el('div','sub','Deploys, configmap/secret edits, and observed issues — chronological.'));
     if (!data.items || !data.items.length) {
       card.append(el('div','empty','Nothing has changed in the last 6 hours.'));
     } else {
       const list = el('div');
-      list.style.cssText = 'background:var(--panel-2);border-radius:8px;padding:12px 16px';
       data.items.reverse().forEach(item => {
-        const icon = ({deploy:'🚀', config_change:'⚙️', issue:'🚨'})[item.kind] || '•';
+        const kindLbl = ({deploy:'deploy', config_change:'config', issue:'issue'})[item.kind] || item.kind;
         const row = el('div');
-        row.style.cssText = 'display:grid;grid-template-columns:80px 30px 1fr;gap:10px;padding:7px 0;border-bottom:1px dashed var(--border);font-size:13.5px';
+        row.style.cssText = 'display:grid;grid-template-columns:80px 80px 1fr;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px';
         row.innerHTML = `
-          <div style="color:var(--muted);font-variant-numeric:tabular-nums">${fmtTime(item.when)}</div>
-          <div>${icon}</div>
-          <div><strong>${escapeHTML(item.label)}</strong>${item.detail?` <span style="color:var(--muted)">— ${escapeHTML(item.detail)}</span>`:''}</div>
+          <div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(item.when)}</div>
+          <div style="color:var(--muted-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em">${kindLbl}</div>
+          <div><strong style="font-weight:500">${escapeHTML(item.label)}</strong>${item.detail?` <span style="color:var(--muted-2)">— ${escapeHTML(item.detail)}</span>`:''}</div>
         `;
         list.append(row);
       });
@@ -1431,7 +1466,7 @@
     const actorData = await api.auditActors();
     if (actorData.actors && actorData.actors.length) {
       const acts = el('div','pcard');
-      acts.append(el('h3','','👤 Active actors'));
+      acts.append(el('h3','','Active actors'));
       const grid = el('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px';
       actorData.actors.slice(0, 12).forEach(a => {
         const isUser = a.actor_type === 'User';
@@ -1451,7 +1486,7 @@
       return;
     }
     const list = el('div','pcard');
-    list.append(el('h3','',`📋 Mutations${auditFilter.actor?` by ${auditFilter.actor}`:''} <span style="color:var(--muted);font-weight:400">(${data.count})</span>`));
+    list.append(el('h3','',`Mutations${auditFilter.actor?` by ${auditFilter.actor}`:''} <span style="color:var(--muted);font-weight:400">(${data.count})</span>`));
     if (auditFilter.actor) {
       const clr = el('button','btn ghost','Clear filter');
       clr.onclick = () => { delete auditFilter.actor; lastRenderSig = null; rerender(true); };
@@ -1462,18 +1497,18 @@
       list.append(el('div','empty','No mutations in this window. Either nothing has changed, or PodPulse needs a few seconds to observe a write.'));
     } else {
       data.events.forEach(e => {
-        const row = el('div'); row.style.cssText='display:grid;grid-template-columns:88px 80px 60px 1fr 70px;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px;align-items:start';
-        const actCol = ({create:'➕', update:'✏️', delete:'🗑️'})[e.action] || '•';
+        const row = el('div'); row.style.cssText='display:grid;grid-template-columns:80px 90px 70px 1fr 60px;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;align-items:start';
+        const actCol = ({create:'create', update:'update', delete:'delete'})[e.action] || e.action;
         const riskCls = ({high:'high',medium:'medium',info:'low'})[e.risk] || 'low';
         const fields = (e.fields||[]).join(', ');
         row.innerHTML = `
-          <div style="color:var(--muted);font-variant-numeric:tabular-nums">${fmtTime(e.when)}</div>
-          <div><strong>${escapeHTML(e.actor)}</strong></div>
-          <div style="font-size:18px">${actCol}</div>
+          <div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(e.when)}</div>
+          <div><strong style="font-weight:500">${escapeHTML(e.actor)}</strong></div>
+          <div style="color:var(--muted-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em">${actCol}</div>
           <div>
-            <strong>${escapeHTML(e.kind)}/${escapeHTML(e.name)}</strong>
-            <span style="color:var(--muted)">${e.namespace?'in '+escapeHTML(e.namespace):''}</span>
-            ${fields?`<div style="color:var(--muted);font-size:11.5px;margin-top:2px">touched: ${escapeHTML(fields)}</div>`:''}
+            <strong style="font-weight:500">${escapeHTML(e.kind)}/${escapeHTML(e.name)}</strong>
+            <span style="color:var(--muted-2)">${e.namespace?'in '+escapeHTML(e.namespace):''}</span>
+            ${fields?`<div style="color:var(--muted-2);font-size:11px;margin-top:2px">touched: ${escapeHTML(fields)}</div>`:''}
           </div>
           <div style="text-align:right"><span class="imp-label ${riskCls}" style="font-size:10.5px">${(e.risk||'').toUpperCase()}</span></div>
         `;
@@ -1492,7 +1527,7 @@
 
     // Onboard form.
     const form = el('div','pcard');
-    form.append(el('h3','','➕ Onboard a teammate'));
+    form.append(el('h3','','Onboard a teammate'));
     form.append(el('div','sub','Creates a ServiceAccount + Role + RoleBinding scoped to one namespace, then issues a 1-hour kubeconfig your teammate can use immediately.'));
     const grid = el('div'); grid.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-top:12px;align-items:end';
     grid.innerHTML = `
@@ -1526,7 +1561,7 @@
 
     // Existing users.
     const list = el('div','pcard');
-    list.append(el('h3','','👥 Onboarded users'));
+    list.append(el('h3','','Onboarded users'));
     if (!data.users || !data.users.length) {
       list.append(el('div','empty','No users onboarded yet. Use the form above to add one.'));
     } else {
@@ -1667,9 +1702,8 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
     const tagCls = a.deployment_correlated ? 'a-tag deploy' : 'a-tag';
     top.append(el('span', tagCls, tagLabel));
     if (a.urgency) {
-      const urgIcon = ({worsening:'🔴', active:'🟠', new:'🔵', settled:'🟢'})[a.urgency] || '⚫';
       const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[a.urgency] || a.urgency;
-      top.append(el('span', `urg ${a.urgency}`, `${urgIcon} ${urgLbl}`));
+      top.append(el('span', `urg ${a.urgency}`, urgLbl));
     }
     const path = el('span','a-path', escapeHTML(wlPath(a.workload)));
     top.append(path);
@@ -1679,8 +1713,7 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
 
     // Three-tier headline (human → technical → raw)
     const tier1 = el('div','h-tier1');
-    const headIcon = a.deployment_correlated ? '🚨 ' : a.urgency === 'worsening' ? '📈 ' : '⚠️ ';
-    tier1.innerHTML = headIcon + escapeHTML(a.human_headline || a.headline || 'New anomaly');
+    tier1.innerHTML = escapeHTML(a.human_headline || a.headline || 'New anomaly');
     if (a.first_seen_in_version) tier1.innerHTML += ' <span class="first-seen">First seen in this version</span>';
     if (a.variants && a.variants.length) tier1.innerHTML += ` <span class="first-seen">+${a.variants.length} variants</span>`;
     card.append(tier1);
@@ -1708,12 +1741,12 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
     impact.append(blastWrap);
     if (a.time_to_detection_seconds) {
       const r = el('div','row');
-      r.innerHTML = `<span>⏱️</span><span>Detected ${humSecs(a.time_to_detection_seconds)} after rollout</span>`;
+      r.innerHTML = `<span>Detected ${humSecs(a.time_to_detection_seconds)} after rollout</span>`;
       impact.append(r);
     }
     if (a.image_digest) {
       const r = el('div','row');
-      r.innerHTML = `<span>🏷️</span><span style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML(a.image_digest.slice(0,22))}…</span>`;
+      r.innerHTML = `<span style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML(a.image_digest.slice(0,22))}…</span>`;
       impact.append(r);
     }
     const times = el('div','a-times', `<div class="ago">${fmtTime(a.fired_at)}</div><div data-fired="${a.fired_at}">${fmtAgo(a.fired_at)}</div>`);
@@ -1932,8 +1965,8 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
       data.deployments.forEach(d => {
         const row = el('div','row');
         const status = d.issue_detected
-          ? `<span style="color:var(--high)">⚠️ Caused ${d.caused_anomalies} anomalies</span>`
-          : `<span style="color:var(--ok)">✅ No issues detected</span>`;
+          ? `<span style="color:var(--high)">Caused ${d.caused_anomalies} anomalies</span>`
+          : `<span style="color:var(--ok)">No issues</span>`;
         row.innerHTML = `
           <div>
             <div class="name"><strong>${escapeHTML(d.workload.name)}</strong> <span style="color:var(--muted);font-size:11.5px;">${escapeHTML(d.workload.namespace)}</span></div>
@@ -2016,7 +2049,7 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
     all.forEach(name => {
       const r = el('div','row');
       const status = configured.has(name)
-        ? `<span style="color:var(--ok)">✅ Configured</span>`
+        ? `<span style="color:var(--ok)">Configured</span>`
         : `<span style="color:var(--muted)">Not configured (set --${name}-webhook or env)</span>`;
       r.innerHTML = `<div class="name">${name[0].toUpperCase()+name.slice(1)}</div>${status}`;
       card.append(r);
@@ -2033,7 +2066,7 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
     const card = el('div','pcard');
     card.append(el('h3','','Detector settings'));
     card.innerHTML += `
-      <div class="row"><div class="name">K8s integration</div><div class="meta">${sum.k8s_connected?'✅ Connected (informers active)':'⚠ Not connected'}</div></div>
+      <div class="row"><div class="name">K8s integration</div><div class="meta">${sum.k8s_connected?'Connected (informers active)':'Not connected'}</div></div>
       <div class="row"><div class="name">Storage policy</div><div class="meta">${escapeHTML(sum.storage_policy||'')}</div></div>
       <div class="row"><div class="name">Detector started</div><div class="meta">${sum.started_at ? new Date(sum.started_at).toLocaleString() : '—'}</div></div>
       <div class="row"><div class="name">Configured channels</div><div class="meta">${(sum.channels||[]).join(', ') || 'none'}</div></div>
@@ -2083,7 +2116,7 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
       sum.recent_deployments.forEach(d => {
         const r = el('div','row');
         const tag = d.issue_detected
-          ? `<span style="color:var(--high);font-size:11px;background:rgba(255,138,61,.12);padding:2px 7px;border-radius:4px;">⚠ Caused issues</span>`
+          ? `<span style="color:var(--high);font-size:11px;background:rgba(255,138,61,.12);padding:2px 7px;border-radius:4px;">Caused issues</span>`
           : `<span style="color:var(--ok);font-size:11px;background:rgba(105,209,153,.10);padding:2px 7px;border-radius:4px;">✓ No issues</span>`;
         r.innerHTML = `<div style="flex:1;min-width:0;"><div class="name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(d.workload.name)}</div><div class="meta">${fmtTime(d.when)}${d.commit?` · ${escapeHTML(d.commit.slice(0,7))}`:''}</div></div>${tag}`;
         rd.append(r);
@@ -2094,7 +2127,7 @@ kubectl get pods -n ${escapeHTML(u.namespace)}</div>
     // Recommendations
     if (sum.recommendations && sum.recommendations.length) {
       const r = el('div','card');
-      r.innerHTML = `<h3>💡 Recommended actions</h3>`;
+      r.innerHTML = `<h3>Recommended actions</h3>`;
       sum.recommendations.forEach((t, i) => r.append(el('div','row',`<div class="name">${i+1}. ${escapeHTML(t)}</div>`)));
       rail.append(r);
     }
