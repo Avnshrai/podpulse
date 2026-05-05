@@ -6,79 +6,148 @@
 <title>PodPulse</title>
 <style>
   /* ============================================================
-     PodPulse — minimalist UI
-     Single accent. No gradients. No emoji chrome. Tight type.
+     PodPulse — Neon-inspired two-app shell.
+     One workspace, two apps: Incidents / Admin.
      ============================================================ */
   :root {
-    --bg:       #0a0a0b;
-    --panel:    #111114;
-    --panel-2:  #17171a;
-    --border:   #1f1f23;
-    --border-2: #2a2a30;
-    --text:     #ededee;
-    --muted:    #8a8a93;
-    --muted-2:  #5a5a63;
-    --accent:   #5b9dff;
-
-    /* Severity tones — only used as small dots / thin left-borders. */
-    --low:      #4ade80;
-    --medium:   #facc15;
-    --high:     #fb923c;
-    --critical: #f87171;
-
-    --radius: 6px;
-    --gap: 14px;
+    --bg:        #0a0a0b;
+    --panel:     #0f0f11;
+    --panel-2:   #14141a;
+    --panel-3:   #18181f;
+    --border:    #1f1f25;
+    --border-2:  #2a2a32;
+    --text:      #ededee;
+    --muted:     #9095a0;
+    --muted-2:   #5e6370;
+    --accent:    #4fb87a;
+    --accent-2:  #5b9dff;
+    --critical:  #f87171;
+    --high:      #fb923c;
+    --medium:    #facc15;
+    --low:       #4ade80;
+    --radius:    6px;
   }
-
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
     font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg); color: var(--text);
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
   }
   a { color: inherit; text-decoration: none; }
   button { font: inherit; color: inherit; cursor: pointer; }
   code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-  /* ---- Layout ---- */
   .app {
     display: grid;
-    grid-template-columns: 220px 1fr 300px;
-    grid-template-rows: 52px 1fr;
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: 56px 1fr;
     grid-template-areas:
-      "side topbar topbar"
-      "side main rail";
+      "topbar topbar"
+      "side main";
     height: 100vh;
   }
 
-  /* ---- Sidebar ---- */
+  /* ---------- TOP BAR ---------- */
+  .topbar {
+    grid-area: topbar;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 18px;
+    background: var(--bg);
+    gap: 6px;
+  }
+  .logo {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--bg);
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 13px;
+    flex: 0 0 auto;
+  }
+  .crumb-sep { color: var(--muted-2); margin: 0 6px; }
+  .crumb {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .crumb:hover { background: var(--panel-2); }
+  .crumb .plan {
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--border-2);
+  }
+  .crumb svg { width: 12px; height: 12px; opacity: .55; }
+
+  .topbar .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .pill-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-2);
+    border-radius: 18px;
+    font-size: 12px; color: var(--muted);
+  }
+  .pill-status .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 rgba(79,184,122,.55);
+    animation: pulse 2s ease-out infinite;
+  }
+  .pill-status.warn .dot { background: var(--high); animation: none; }
+  .pill-status.crit .dot { background: var(--critical); animation: none; }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(79,184,122,.45); }
+    50%     { box-shadow: 0 0 0 6px rgba(79,184,122,0); }
+  }
+  .icon-btn {
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    color: var(--muted); border-radius: 6px;
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--panel-2); color: var(--text); }
+  .topbar .upgrade {
+    background: var(--text); color: var(--bg);
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--text);
+    font-size: 12px; font-weight: 500;
+  }
+  .topbar .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--panel-3);
+    border: 1px solid var(--border-2);
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 600; color: var(--text);
+    margin-left: 4px;
+  }
+
+  /* ---------- SIDEBAR ---------- */
   .side {
     grid-area: side;
     background: var(--panel);
     border-right: 1px solid var(--border);
+    overflow-y: auto;
     display: flex; flex-direction: column;
-    padding: 14px 10px;
+    padding: 14px 8px 12px;
   }
-  .brand {
-    display: flex; align-items: center; gap: 10px;
-    padding: 4px 8px 14px;
-    margin-bottom: 6px;
+  .side-section {
+    font-size: 10.5px; color: var(--muted-2);
+    text-transform: uppercase; letter-spacing: .08em;
+    padding: 12px 10px 6px;
+    font-weight: 500;
   }
-  .brand .pulse-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    flex: 0 0 auto;
-  }
-  .brand .name { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
-
+  .side-section:first-child { padding-top: 4px; }
   .nav-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 6px 8px;
+    padding: 7px 10px;
     border-radius: 5px;
     color: var(--muted);
     font-size: 13px;
@@ -86,96 +155,175 @@
     margin-bottom: 1px;
   }
   .nav-item:hover { color: var(--text); background: var(--panel-2); }
-  .nav-item.active { color: var(--text); background: var(--panel-2); }
-  .nav-item .ic { width: 14px; height: 14px; opacity: .7; }
+  .nav-item.active {
+    color: var(--text);
+    background: var(--panel-2);
+  }
+  .nav-item .ic { width: 14px; height: 14px; opacity: .7; flex: 0 0 auto; }
   .nav-item.active .ic { opacity: 1; }
   .nav-item .badge {
     margin-left: auto;
-    color: var(--muted-2);
-    font-size: 11px;
+    color: var(--muted-2); font-size: 11px;
     font-variant-numeric: tabular-nums;
   }
   .nav-item.active .badge { color: var(--muted); }
 
-  .side-foot {
-    margin-top: auto;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 11.5px;
-  }
-  .storage-card { padding: 8px; margin-bottom: 6px; }
-  .storage-card .row1 { display: flex; align-items: center; gap: 6px; color: var(--low); font-size: 11px; }
-  .storage-card .row2 { color: var(--text); font-size: 12px; margin-top: 2px; }
-  .storage-card .row3 { color: var(--muted-2); font-size: 11px; }
-  .user-card { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
-  .avatar {
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    background: var(--panel-2);
+  .branch-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
     border: 1px solid var(--border-2);
-    display: grid; place-items: center;
-    font-weight: 600; font-size: 11px;
+    border-radius: 6px;
+    margin: 6px 4px 8px;
+    font-size: 12.5px;
+    cursor: pointer;
     color: var(--text);
   }
-  .user-card .name { font-size: 12.5px; color: var(--text); }
-  .user-card .role { font-size: 11px; color: var(--muted-2); }
+  .branch-pill:hover { background: var(--panel-2); }
+  .branch-pill svg { width: 12px; height: 12px; margin-left: auto; opacity: .55; }
 
-  /* ---- Topbar ---- */
-  .topbar {
-    grid-area: topbar;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center;
-    padding: 0 22px;
-    gap: 14px;
-    background: var(--bg);
+  .side-foot {
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    color: var(--muted-2);
   }
-  .topbar h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
-  .topbar .meta {
-    margin-left: auto; display: flex; align-items: center; gap: 16px;
-    color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums;
-  }
-  .bell { position: relative; padding: 4px; cursor: pointer; color: var(--muted); }
-  .bell:hover { color: var(--text); }
-  .bell .count {
-    position: absolute; top: -2px; right: -2px;
-    background: var(--critical); color: white;
-    border-radius: 8px;
-    font-size: 9px;
-    padding: 1px 5px;
-    min-width: 14px; text-align: center;
-  }
+  .side-foot .nav-item { color: var(--muted-2); font-size: 12px; }
 
-  /* ---- Main ---- */
+  /* ---------- MAIN ---------- */
   .main {
     grid-area: main;
     overflow-y: auto;
-    padding: 20px 28px 60px;
+    padding: 22px 28px 60px;
+  }
+  .page-head {
+    display: flex; align-items: center;
+    margin-bottom: 22px;
+  }
+  .page-head h1 {
+    margin: 0;
+    font-size: 22px; letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .page-head .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 12.5px;
+  }
+  .btn:hover { border-color: var(--muted-2); background: var(--panel-2); }
+  .btn.primary {
+    background: var(--text); color: var(--bg); border-color: var(--text);
+  }
+  .btn.primary:hover { background: #fff; }
+  .btn.danger { color: var(--critical); border-color: rgba(248,113,113,.35); }
+  .btn.ghost { border-color: transparent; color: var(--muted); }
+  .btn.ghost:hover { background: var(--panel-2); color: var(--text); }
+  .btn svg { width: 13px; height: 13px; }
+
+  /* Stat / connect cards (Neon top-row pattern) */
+  .card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+  .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .grid-card h4 {
+    margin: 0 0 4px; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .grid-card h4 .ic { width: 14px; height: 14px; color: var(--muted); }
+  .grid-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+  .pcard {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .pcard h2 {
+    margin: 0 0 4px; font-size: 14px; font-weight: 600;
+  }
+  .pcard .sub {
+    color: var(--muted-2); font-size: 12px; margin-bottom: 14px;
   }
 
-  /* ---- Right rail ---- */
-  .rail {
-    grid-area: rail;
-    border-left: 1px solid var(--border);
-    overflow-y: auto;
-    padding: 18px 18px 60px;
-    background: var(--bg);
+  /* Big stat row (like "Branches 1/10") */
+  .big-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 18px;
   }
-  .rail .card {
-    border-bottom: 1px solid var(--border);
-    padding: 14px 0;
+  .big-stat {
+    padding: 16px 20px;
+    border-right: 1px solid var(--border);
   }
-  .rail .card:first-child { padding-top: 0; }
-  .rail .card:last-child { border-bottom: 0; }
-  .rail .card h3 {
-    margin: 0 0 8px; font-size: 11px; font-weight: 500;
-    color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
-  }
-  .rail .card .sub {
-    font-size: 11px; color: var(--muted-2); margin-bottom: 10px;
-  }
+  .big-stat:last-child { border-right: 0; }
+  .big-stat .l { color: var(--muted); font-size: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .big-stat .v { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .big-stat .v .of { color: var(--muted-2); font-size: 18px; font-weight: 500; }
 
-  /* ---- Severity tabs ---- */
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-2); font-weight: 500; }
+  td { color: var(--muted); }
+  td strong { color: var(--text); font-weight: 500; }
+
+  /* Severity dots / pills */
+  .sevdot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+  .sevdot.critical { background: var(--critical); }
+  .sevdot.high { background: var(--high); }
+  .sevdot.medium { background: var(--medium); }
+  .sevdot.low { background: var(--low); }
+
+  /* Issue card (incidents app) */
+  .a-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+  }
+  .a-card.sev-low      { border-left: 2px solid var(--low); }
+  .a-card.sev-medium   { border-left: 2px solid var(--medium); }
+  .a-card.sev-high     { border-left: 2px solid var(--high); }
+  .a-card.sev-critical { border-left: 2px solid var(--critical); }
+
+  .a-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .a-tag { color: var(--muted-2); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; font-weight: 500; }
+  .a-path { color: var(--muted); font-family: ui-monospace, monospace; font-size: 11.5px; }
+  .a-sev { margin-left: auto; color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
+  .a-card.sev-low .a-sev      { color: var(--low); }
+  .a-card.sev-medium .a-sev   { color: var(--medium); }
+  .a-card.sev-high .a-sev     { color: var(--high); }
+  .a-card.sev-critical .a-sev { color: var(--critical); }
+
+  .h-tier1 { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
+  .h-tier2 { color: var(--muted); margin-top: 2px; font-size: 12.5px; }
+  .a-story { color: var(--muted); margin-top: 8px; font-size: 12.5px; }
+
+  .a-confidence {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px;
+    font-size: 11.5px; color: var(--muted);
+  }
+  .a-confidence .bar { flex: 1; height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; }
+  .a-confidence .bar > div { height: 100%; background: var(--accent-2); }
+  .a-confidence strong { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
+
+  .a-actions { display: flex; gap: 6px; margin-top: 14px; }
+
+  /* Severity tabs (incidents page) */
   .tabs {
     display: flex; align-items: center; gap: 18px;
     border-bottom: 1px solid var(--border);
@@ -183,394 +331,47 @@
   }
   .tab {
     color: var(--muted); cursor: pointer;
-    padding-bottom: 8px;
-    margin-bottom: -10px;
+    padding-bottom: 8px; margin-bottom: -10px;
     border-bottom: 1px solid transparent;
     display: flex; align-items: center; gap: 8px;
     font-size: 12.5px;
   }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--text); border-color: var(--text); }
-  .tab .dot { width: 6px; height: 6px; border-radius: 50%; }
-  .tab .num {
-    color: var(--muted-2); font-size: 11.5px; font-variant-numeric: tabular-nums;
-  }
-  .tab.active .num { color: var(--muted); }
-  .tab.crit .dot { background: var(--critical); }
-  .tab.high .dot { background: var(--high); }
-  .tab.med  .dot { background: var(--medium); }
-  .tab.low  .dot { background: var(--low); }
+  .tab .num { color: var(--muted-2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
-  .filters-row {
-    display: flex; align-items: center; gap: 8px; justify-content: flex-end;
-    margin-top: -54px; margin-bottom: 18px;
-  }
-  .pill {
-    background: transparent; border: 1px solid var(--border-2);
-    border-radius: var(--radius); padding: 5px 10px;
-    color: var(--muted); font-size: 12px;
-    display: inline-flex; align-items: center; gap: 6px;
-    cursor: pointer;
-  }
-  .pill:hover { color: var(--text); border-color: var(--muted-2); }
-  .pill.primary {
-    background: var(--text); border-color: var(--text); color: var(--bg);
-  }
-  .pill svg { width: 12px; height: 12px; opacity: .8; }
-
-  /* ---- Issue / Anomaly card ---- */
-  .a-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    margin-bottom: 10px;
-  }
-  /* Severity is conveyed by a small left dot — no full bars, no gradients. */
-  .a-card.sev-low      { border-left: 2px solid var(--low); }
-  .a-card.sev-medium   { border-left: 2px solid var(--medium); }
-  .a-card.sev-high     { border-left: 2px solid var(--high); }
-  .a-card.sev-critical { border-left: 2px solid var(--critical); }
-
-  .a-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-  .a-tag {
-    color: var(--muted); font-size: 10.5px; letter-spacing: .04em;
-    text-transform: uppercase; font-weight: 500;
-  }
-  .a-path {
-    color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11.5px;
-  }
-  .a-sev {
-    margin-left: auto; color: var(--muted); font-size: 10.5px;
-    text-transform: uppercase; letter-spacing: .04em; font-weight: 500;
-  }
-  .sev-low      .a-sev { color: var(--low); }
-  .sev-medium   .a-sev { color: var(--medium); }
-  .sev-high     .a-sev { color: var(--high); }
-  .sev-critical .a-sev { color: var(--critical); }
-
-  /* Three-tier headline */
-  .h-tier1 { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.4; }
-  .h-tier2 { color: var(--muted); margin-top: 2px; font-size: 13px; }
-  .h-tier3 {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
-    color: var(--muted-2); margin-top: 4px; word-break: break-all;
-  }
-
-  /* Urgency — small text label only, no chip background */
-  .urg { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; font-weight: 500; }
-  .urg.new       { color: var(--accent); }
-  .urg.active    { color: var(--high); }
-  .urg.worsening { color: var(--critical); }
-  .urg.settled   { color: var(--low); }
-
-  /* Impact label — single colored word, not a chip */
-  .imp-label {
-    font-size: 11.5px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase;
-  }
-  .imp-label.low  { color: var(--low); }
-  .imp-label.med  { color: var(--medium); }
-  .imp-label.high { color: var(--high); }
-  .imp-label.crit { color: var(--critical); }
-
-  .a-story { color: var(--muted); margin-top: 10px; font-size: 12.5px; }
-
-  .a-meta {
-    display: grid; grid-template-columns: 1fr auto; gap: 18px;
-    align-items: flex-start; margin-top: 12px;
-  }
-  .a-impact { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; }
-  .a-impact .row { display: flex; align-items: center; gap: 6px; }
-  .a-times { color: var(--muted-2); font-size: 11.5px; text-align: right; line-height: 1.5; }
-  .a-times .ago { color: var(--muted); font-variant-numeric: tabular-nums; }
-
-  .a-timeline {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    margin-top: 12px;
-    padding: 8px 0;
-    border-top: 1px solid var(--border);
-    font-size: 11.5px; color: var(--muted-2);
-  }
-  .a-timeline .step { display: inline-flex; align-items: center; gap: 6px; }
-  .a-timeline .step strong { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
-  .a-timeline .arrow { color: var(--border-2); }
-
-  .a-confidence {
-    display: flex; align-items: center; gap: 10px; margin-top: 12px;
-    font-size: 11.5px; color: var(--muted);
-  }
-  .a-confidence .bar { flex: 1; height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; }
-  .a-confidence .bar > div { height: 100%; background: var(--accent); }
-  .a-confidence strong { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
-
-  .conf-explain { margin-top: 4px; font-size: 11px; color: var(--muted-2); }
-  .conf-explain ul { margin: 2px 0 0; padding-left: 14px; }
-  .conf-explain li { margin: 1px 0; }
-  .conf-help {
-    margin-left: 6px; cursor: help; color: var(--muted-2);
-    border: 1px solid var(--border-2); border-radius: 50%;
-    width: 12px; height: 12px;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 9px;
-  }
-
-  .a-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--muted-2); }
-  .a-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: 11px; }
-
-  .first-seen {
-    margin-left: 6px; color: var(--accent); font-size: 11px;
-    font-weight: 400;
-  }
-
-  /* Buttons */
-  .a-actions { display: flex; gap: 6px; margin-top: 14px; }
-  .btn {
-    background: transparent; border: 1px solid var(--border-2);
-    color: var(--muted); padding: 5px 11px; border-radius: var(--radius);
-    font-size: 12px;
-  }
-  .btn:hover { color: var(--text); border-color: var(--muted-2); }
-  .btn.primary {
-    background: var(--text); border-color: var(--text); color: var(--bg);
-  }
-  .btn.primary:hover { background: #fff; border-color: #fff; }
-  .btn.ghost { border-color: transparent; }
-  .btn.ghost:hover { background: var(--panel-2); border-color: transparent; }
-
-  /* Numbered next-steps */
-  .steps { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .steps h4 {
-    font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--muted-2); font-weight: 500; margin: 0 0 8px;
-  }
-  .step {
-    display: grid; grid-template-columns: 20px 1fr; gap: 10px;
-    margin-bottom: 8px; align-items: start;
-  }
-  .step-num {
-    width: 18px; height: 18px;
-    border-radius: 50%;
+  /* Forms (clusters / users onboarding) */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+  .form-grid.full { grid-template-columns: 1fr; }
+  .field { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--muted-2); }
+  .field input, .field select, .field textarea {
     background: var(--panel-2);
-    color: var(--muted);
-    font-size: 11px; font-weight: 500;
-    display: grid; place-items: center;
-  }
-  .step-body { font-size: 12.5px; }
-  .step-body .t { font-weight: 500; }
-  .step-body code {
-    display: block;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 9px;
-    margin-top: 4px;
-    font-size: 11.5px;
+    border: 1px solid var(--border-2);
     color: var(--text);
-    word-break: break-all;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font: inherit;
   }
-  .step-body .why { font-size: 11.5px; color: var(--muted-2); margin-top: 3px; }
+  .field textarea { resize: vertical; min-height: 120px; font-family: ui-monospace, monospace; font-size: 12px; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent-2); }
 
-  /* Generic cards / lists / tables */
-  .pcard {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    margin-bottom: 12px;
-    background: var(--panel);
-  }
-  .pcard h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
-  .pcard h3 + .sub, .pcard .sub { font-size: 11.5px; color: var(--muted-2); margin-bottom: 10px; }
-  .row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 0; border-bottom: 1px solid var(--border);
-  }
-  .row:last-child { border-bottom: 0; }
-  .row .name { font-size: 12.5px; }
-  .row .meta { color: var(--muted); font-size: 11.5px; }
-  .row .num { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-
-  /* Severity totals — flat, gridded */
-  .sev-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 10px; background: var(--border); }
-  .sev-cell { background: var(--panel); padding: 8px 10px; }
-  .sev-cell .n { font-size: 16px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-  .sev-cell .l { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-2); margin-top: 2px; }
-  .sev-cell.crit .n { color: var(--critical); }
-  .sev-cell.high .n { color: var(--high); }
-  .sev-cell.med  .n { color: var(--medium); }
-  .sev-cell.low  .n { color: var(--low); }
-
-  .total-line { display: flex; align-items: baseline; gap: 10px; }
-  .total-line .big { font-size: 28px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-  .total-line .lbl { color: var(--muted); font-size: 11.5px; }
-
-  /* Tables */
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
-  th {
-    font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--muted-2); font-weight: 500;
-  }
-  td { color: var(--muted); }
-  td strong { color: var(--text); font-weight: 500; }
-
-  /* Severity dot helper */
-  .sevdot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
-  .sevdot.critical { background: var(--critical); }
-  .sevdot.high { background: var(--high); }
-  .sevdot.medium { background: var(--medium); }
-  .sevdot.low { background: var(--low); }
-
-  /* ---- Overview hero / stat row / panels ---- */
-  .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .hero {
-    grid-column: 1 / -1;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px 22px;
-    background: var(--panel);
-  }
-  .hero.crit { border-left: 2px solid var(--critical); }
-  .hero.high { border-left: 2px solid var(--high); }
-  .hero.med  { border-left: 2px solid var(--medium); }
-  .hero.low  { border-left: 2px solid var(--low); }
-  .hero.calm { border-left: 2px solid var(--low); }
-  .hero h2 { margin: 0 0 4px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-  .hero .lede { color: var(--muted); margin-bottom: 0; font-size: 12.5px; }
-
-  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0 0; }
-  .stat-cell {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    background: var(--panel);
-  }
-  .stat-cell .n { font-size: 22px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-  .stat-cell .l { font-size: 11px; color: var(--muted-2); margin-top: 2px; text-transform: uppercase; letter-spacing: .05em; }
-  .stat-cell.crit .n { color: var(--critical); }
-  .stat-cell.high .n { color: var(--high); }
-  .stat-cell.warn .n { color: var(--medium); }
-  .stat-cell.ok   .n { color: var(--low); }
-
-  .deploy-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; background: var(--panel); }
-  .deploy-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .deploy-row:last-child { border-bottom: 0; }
-  .deploy-row .dot {
-    width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto;
-  }
-  .deploy-row .dot.bad { background: var(--high); }
-  .deploy-row .dot.ok  { background: var(--low); }
-  .deploy-row .body { flex: 1; min-width: 0; }
-  .deploy-row .name {
-    font-weight: 500; font-size: 12.5px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .deploy-row .sub { font-size: 11px; color: var(--muted-2); }
-  .deploy-row .badge { font-size: 11px; flex: 0 0 auto; }
-  .deploy-row .badge.bad { color: var(--high); }
-  .deploy-row .badge.ok  { color: var(--low); }
-
-  .rec-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 16px;
-    background: var(--panel);
-  }
-  .rec-card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
-  .rec-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
-  .rec-reason { color: var(--muted); margin-bottom: 10px; font-size: 12px; }
-
-  /* Blast-radius dots */
-  .blast { display: inline-flex; gap: 3px; align-items: center; }
-  .blast .b { width: 6px; height: 6px; border-radius: 50%; background: var(--border-2); }
-  .blast .b.on { background: var(--high); }
-  .blast.crit .b.on { background: var(--critical); }
-  .blast.med  .b.on { background: var(--medium); }
-  .blast.low  .b.on { background: var(--low); }
-
-  /* Collapsed-low fold */
-  .low-fold {
-    border: 1px dashed var(--border-2);
-    border-radius: var(--radius);
-    padding: 10px 14px;
-    color: var(--muted-2);
-    font-size: 12px;
-    cursor: pointer;
-    margin-bottom: 10px;
-    text-align: center;
-  }
-  .low-fold:hover { color: var(--muted); }
-
-  /* Before/after panel — inline, flat */
-  .ba-panel {
-    display: grid; grid-template-columns: 1fr 1fr auto;
-    gap: 16px; margin-top: 12px;
-    padding: 12px 0; border-top: 1px solid var(--border);
-  }
-  .ba-cell .l { font-size: 10.5px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .05em; }
-  .ba-cell .n {
-    font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
-    margin-top: 2px;
-  }
-  .ba-cell .n.bad { color: var(--high); }
-  .ba-cell .n.ok { color: var(--low); }
-  .ba-cell .s { font-size: 11px; color: var(--muted-2); margin-top: 2px; }
-  .ba-change { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
-  .ba-change .v { font-size: 16px; font-weight: 600; color: var(--high); font-variant-numeric: tabular-nums; }
-  .ba-change .l { font-size: 10.5px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .05em; }
-
-  /* Narrative box */
-  .narrative {
-    background: transparent;
-    border-top: 1px solid var(--border);
-    padding: 12px 0 0;
-    margin-top: 12px;
-    color: var(--muted);
-    font-size: 12.5px;
-    line-height: 1.55;
-  }
-  .narrative h4 {
-    margin: 0 0 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--muted-2); font-weight: 500;
-  }
-  .cause { color: var(--text); margin-top: 6px; font-size: 12.5px; }
-
-  /* Empty states */
+  /* Empty / loading */
   .empty { padding: 60px 0; text-align: center; color: var(--muted-2); font-size: 12.5px; }
-  .empty .pulse-dot {
-    display: block; width: 8px; height: 8px;
-    margin: 0 auto 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    opacity: .8;
-  }
 
   /* Modal */
-  .modal-shade { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60; display: grid; place-items: center; padding: 24px; }
+  .modal-shade { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 60; display: grid; place-items: center; padding: 24px; }
   .modal {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 22px 24px;
-    max-width: 640px; width: 100%;
-    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 22px 24px;
+    max-width: 720px; width: 100%; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 30px 80px rgba(0,0,0,.6);
   }
-  .modal h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .modal h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
   .modal .cmd {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 12px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    color: var(--text);
-    margin: 12px 0;
-    word-break: break-all;
-    white-space: pre-wrap;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 12px;
+    font-family: ui-monospace, monospace; font-size: 12px; color: var(--text);
+    margin: 8px 0; word-break: break-all; white-space: pre-wrap;
   }
   .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 
@@ -578,971 +379,645 @@
   .toast {
     position: fixed; bottom: 20px; right: 20px;
     background: var(--panel); border: 1px solid var(--border-2);
-    padding: 8px 14px; border-radius: var(--radius);
+    padding: 8px 14px; border-radius: 6px;
     font-size: 12.5px;
     box-shadow: 0 10px 30px rgba(0,0,0,.5);
+    z-index: 100;
+  }
+
+  /* Severity color helpers */
+  .imp-label { font-size: 11px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; }
+  .imp-label.low  { color: var(--low); }
+  .imp-label.med  { color: var(--medium); }
+  .imp-label.high { color: var(--high); }
+  .imp-label.crit { color: var(--critical); }
+
+  .row-line {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .row-line:last-child { border-bottom: 0; }
+  .row-line .meta { color: var(--muted); font-size: 11.5px; }
+
+  /* Cluster card (admin app) */
+  .cluster-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 8px;
+    display: grid; grid-template-columns: 1fr 200px 220px auto; gap: 14px; align-items: center;
+  }
+  .cluster-card .name { font-weight: 500; }
+  .cluster-card .meta { color: var(--muted-2); font-size: 11.5px; }
+
+  /* Audit table tweaks */
+  .audit-row {
+    display: grid; grid-template-columns: 80px 110px 70px 1fr 70px;
+    gap: 12px; padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px; align-items: start;
+  }
+
+  /* What changed timeline */
+  .tl-row {
+    display: grid; grid-template-columns: 80px 80px 1fr;
+    gap: 12px; padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+
+  /* Help banners (Neon-style "Get connected") */
+  .info-banner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .info-banner h3 {
+    margin: 0 0 14px;
+    font-size: 14px; font-weight: 500;
+    display: flex; align-items: center;
+  }
+  .info-banner h3 .dismiss {
+    margin-left: auto; color: var(--muted-2); cursor: pointer;
+    font-size: 12px;
+  }
+  .info-banner h3 .dismiss:hover { color: var(--text); }
+
+  /* Steps modal style for kubeconfig */
+  .step-line {
+    display: grid; grid-template-columns: 22px 1fr; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .step-num {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    color: var(--muted);
+    font-size: 11px; font-weight: 500;
+    display: grid; place-items: center;
   }
 </style>
 </head>
 <body>
 
 <div class="app">
-  <aside class="side">
-    <div class="brand">
-      <div class="pulse-dot"></div>
-      <div class="name">PodPulse</div>
-    </div>
-    <a class="nav-item" data-route="overview">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
-      Overview
-    </a>
-    <a class="nav-item active" data-route="issues">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 22h20L12 2zM12 9v5M12 18h.01"/></svg>
-      Issues <span class="badge" id="nav-issues-count">0</span>
-    </a>
-    <a class="nav-item" data-route="changes">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h12"/></svg>
-      What changed
-    </a>
-    <a class="nav-item" data-route="workloads">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
-      Workloads
-    </a>
-    <a class="nav-item" data-route="incidents">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16a2 2 0 01-2 2H6l-4 4V4a2 2 0 012-2h16a2 2 0 012 2v12z"/></svg>
-      Incidents
-    </a>
-    <a class="nav-item" data-route="deployments">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v18l7-5 7 5V3z"/></svg>
-      Deployments
-    </a>
-    <a class="nav-item" data-route="services">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
-      Services
-    </a>
-    <a class="nav-item" data-route="events">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      Events
-    </a>
-    <a class="nav-item" data-route="audit">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v6H3zM3 15h18v6H3zM7 6h.01M7 18h.01"/></svg>
-      Audit log
-    </a>
-    <a class="nav-item" data-route="users">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-      Users
-    </a>
-    <a class="nav-item" data-route="silences">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
-      Silences
-    </a>
-    <a class="nav-item" data-route="channels">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      Channels
-    </a>
-    <a class="nav-item" data-route="settings">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1l2.1-1.6-2-3.4-2.5.9a7 7 0 00-1.7-1L14 3h-4l-.8 2.5a7 7 0 00-1.7 1l-2.5-.9-2 3.4L5.1 11a7 7 0 000 2L3 14.6l2 3.4 2.5-.9c.5.4 1.1.7 1.7 1L10 21h4l.8-2.5a7 7 0 001.7-1l2.5.9 2-3.4-2.1-1.6c.1-.3.1-.7.1-1z"/></svg>
-      Settings
-    </a>
 
-    <div class="side-foot">
-      <div class="storage-card" title="Templates and counts only — raw logs are not retained.">
-        <div class="row1">
-          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-          Storage Mode
-        </div>
-        <div class="row2">Template &amp; metrics only</div>
-        <div class="row3">(Raw logs disabled)</div>
-      </div>
-      <div class="user-card">
-        <div class="avatar">AD</div>
-        <div>
-          <div class="name">Admin</div>
-          <div class="role">Administrator</div>
-        </div>
-      </div>
-    </div>
-  </aside>
-
+  <!-- TOP BAR -->
   <header class="topbar">
-    <h1 id="page-title">Anomalies</h1>
-    <div class="meta">
-      <div class="bell" title="Notifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>
-        <span class="count" id="bell-count">0</span>
-      </div>
-      <div id="topbar-count">0 anomalies</div>
-      <div id="topbar-time"></div>
+    <div class="logo">P</div>
+    <div class="crumb">
+      <span>PodPulse</span>
+      <span class="plan">Free</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4"/></svg>
+    </div>
+    <span class="crumb-sep">/</span>
+    <div class="crumb" id="cluster-picker">
+      <span id="cluster-picker-label">in-cluster</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4"/></svg>
+    </div>
+
+    <div class="right">
+      <div class="pill-status" id="status-pill"><span class="dot"></span><span id="status-text">All OK</span></div>
+      <div class="icon-btn" title="Help">?</div>
+      <div class="avatar">A</div>
     </div>
   </header>
 
-  <main class="main" id="main"></main>
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="side-section">App</div>
+    <a class="nav-item active" data-app="incidents">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 22h20L12 2zM12 9v5M12 18h.01"/></svg>
+      Incidents
+      <span class="badge" id="nav-issues-count"></span>
+    </a>
+    <a class="nav-item" data-app="admin">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1l2.1-1.6-2-3.4-2.5.9a7 7 0 00-1.7-1L14 3h-4l-.8 2.5a7 7 0 00-1.7 1l-2.5-.9-2 3.4L5.1 11a7 7 0 000 2L3 14.6l2 3.4 2.5-.9c.5.4 1.1.7 1.7 1L10 21h4l.8-2.5a7 7 0 001.7-1l2.5.9 2-3.4-2.1-1.6c.1-.3.1-.7.1-1z"/></svg>
+      Admin &amp; Audit
+    </a>
 
-  <aside class="rail" id="rail"></aside>
+    <div id="incidents-nav">
+      <div class="side-section">Incidents</div>
+      <a class="nav-item active" data-route="overview">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+        Overview
+      </a>
+      <a class="nav-item" data-route="issues">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        Issues
+      </a>
+      <a class="nav-item" data-route="changes">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h12"/></svg>
+        What changed
+      </a>
+      <a class="nav-item" data-route="workloads">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
+        Workloads
+      </a>
+      <a class="nav-item" data-route="deployments">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v18l7-5 7 5V3z"/></svg>
+        Deployments
+      </a>
+      <a class="nav-item" data-route="services">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+        Services
+      </a>
+    </div>
+
+    <div id="admin-nav" style="display:none">
+      <div class="side-section">Admin</div>
+      <a class="nav-item active" data-route="clusters">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18"/></svg>
+        Clusters
+      </a>
+      <a class="nav-item" data-route="users">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        Users
+      </a>
+      <a class="nav-item" data-route="audit">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v6H3zM3 15h18v6H3zM7 6h.01M7 18h.01"/></svg>
+        Audit log
+      </a>
+      <a class="nav-item" data-route="channels">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Channels
+      </a>
+      <a class="nav-item" data-route="settings">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1l2.1-1.6-2-3.4-2.5.9a7 7 0 00-1.7-1L14 3h-4l-.8 2.5a7 7 0 00-1.7 1l-2.5-.9-2 3.4L5.1 11a7 7 0 000 2L3 14.6l2 3.4 2.5-.9c.5.4 1.1.7 1.7 1L10 21h4l.8-2.5a7 7 0 001.7-1l2.5.9 2-3.4-2.1-1.6c.1-.3.1-.7.1-1z"/></svg>
+        Settings
+      </a>
+    </div>
+
+    <div class="side-foot">
+      <a class="nav-item" href="https://github.com/Avnshrai/podpulse" target="_blank">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.13c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.25 3.34.95.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.27-5.24-5.65 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.16 1.18a11 11 0 015.74 0c2.2-1.49 3.16-1.18 3.16-1.18.62 1.57.23 2.73.11 3.02.74.8 1.18 1.82 1.18 3.07 0 4.39-2.69 5.36-5.25 5.64.41.36.78 1.06.78 2.13v3.16c0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12c0-6.35-5.15-11.5-11.5-11.5z"/></svg>
+        Open on GitHub
+      </a>
+    </div>
+  </aside>
+
+  <main class="main" id="main"></main>
 </div>
 
 <script type="module">
-  // -------------- helpers --------------
-  const $ = (s, p=document) => p.querySelector(s);
-  const $$ = (s, p=document) => Array.from(p.querySelectorAll(s));
-  const el = (tag, cls, content) => {
+  // ----- helpers -----
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const el = (tag, cls, html) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
-    if (content != null) e.innerHTML = content;
+    if (html != null) e.innerHTML = html;
     return e;
   };
-  const fmtTime = d => new Date(d).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const escapeHTML = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtTime = d => new Date(d).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   const fmtAgo = d => {
     const ms = Date.now() - new Date(d).getTime();
     if (ms < 60_000) return 'a few seconds ago';
-    const m = Math.floor(ms / 60_000);
+    const m = Math.floor(ms/60_000);
     if (m < 60) return m + ' min ago';
-    const h = Math.floor(m / 60);
+    const h = Math.floor(m/60);
     return h + ' hr ago';
   };
-  const sevColor = s => ({critical:'critical',high:'high',medium:'medium',low:'low'}[s] || 'medium');
-  const sevPretty = s => (s||'medium').toUpperCase();
+  const sevColor = s => ({critical:'critical',high:'high',medium:'medium',low:'low'})[s] || 'medium';
   const wlPath = w => `${w.namespace || '?'} / ${w.kind || '?'} / ${w.name || '?'}`;
-  const escapeHTML = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  // -------------- API --------------
+  function toast(msg) {
+    const t = el('div','toast', escapeHTML(msg));
+    document.body.append(t);
+    setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(() => t.remove(), 300); }, 2200);
+  }
+
+  // ----- API -----
   const api = {
-    summary:      () => fetch('/v1/summary').then(r => r.json()),
-    anomalies:    q => fetch('/v1/anomalies?' + new URLSearchParams(q||{})).then(r => r.json()),
-    anomaly:      id => fetch('/v1/anomalies/' + encodeURIComponent(id)).then(r => r.json()),
-    setState:     (id, action) => fetch(`/v1/anomalies/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
-    issues:       q => fetch('/v1/issues?' + new URLSearchParams(q||{})).then(r => r.json()),
-    issue:        id => fetch('/v1/issues/' + encodeURIComponent(id)).then(r => r.json()),
-    issueState:   (id, action) => fetch(`/v1/issues/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
-    timeline:     q => fetch('/v1/timeline?' + new URLSearchParams(q||{})).then(r => r.json()),
-    configChanges:() => fetch('/v1/config-changes').then(r => r.json()),
-    audit:        q => fetch('/v1/audit?' + new URLSearchParams(q||{})).then(r => r.json()),
-    auditActors:  () => fetch('/v1/audit/actors').then(r => r.json()),
-    listUsers:    () => fetch('/v1/users').then(r => r.json()),
-    createUser:   body => fetch('/v1/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
-    deleteUser:   name => fetch('/v1/users/' + encodeURIComponent(name), {method:'DELETE'}),
-    userKubeconfigURL: name => '/v1/users/' + encodeURIComponent(name) + '/kubeconfig',
-    workloads:    () => fetch('/v1/workloads').then(r => r.json()),
-    services:     () => fetch('/v1/services').then(r => r.json()),
-    deployments:  () => fetch('/v1/deployments').then(r => r.json()),
-    events:       () => fetch('/v1/events').then(r => r.json()),
-    incidents:    () => fetch('/v1/incidents').then(r => r.json()),
-    channels:     () => fetch('/v1/channels').then(r => r.json()),
+    summary:    () => fetch('/v1/summary').then(r => r.json()),
+    issues:     q => fetch('/v1/issues?' + new URLSearchParams(q||{})).then(r => r.json()),
+    issue:      id => fetch('/v1/issues/' + encodeURIComponent(id)).then(r => r.json()),
+    issueState: (id, action) => fetch(`/v1/issues/${encodeURIComponent(id)}/${action}`, {method:'POST'}).then(r => r.json()),
+    timeline:   q => fetch('/v1/timeline?' + new URLSearchParams(q||{})).then(r => r.json()),
+    workloads:  () => fetch('/v1/workloads').then(r => r.json()),
+    services:   () => fetch('/v1/services').then(r => r.json()),
+    deployments:() => fetch('/v1/deployments').then(r => r.json()),
+    audit:      q => fetch('/v1/audit?' + new URLSearchParams(q||{})).then(r => r.json()),
+    auditActors:() => fetch('/v1/audit/actors').then(r => r.json()),
+    listUsers:  () => fetch('/v1/users').then(r => r.json()),
+    createUser: body => fetch('/v1/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
+    deleteUser: name => fetch('/v1/users/' + encodeURIComponent(name), {method:'DELETE'}),
+    userKubeURL: name => '/v1/users/' + encodeURIComponent(name) + '/kubeconfig',
+    listClusters: () => fetch('/v1/clusters').then(r => r.json()),
+    registerCluster: body => fetch('/v1/clusters', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
+    deleteCluster: id => fetch('/v1/clusters/' + encodeURIComponent(id), {method:'DELETE'}),
+    channels:   () => fetch('/v1/channels').then(r => r.json()),
   };
 
-  // -------------- routing --------------
-  const routes = {
-    overview:    renderOverview,
-    issues:      renderIssues,
-    changes:     renderChanges,
-    audit:       renderAudit,
-    users:       renderUsers,
-    anomalies:   renderAnomalies,
-    workloads:   renderWorkloads,
-    incidents:   renderIncidents,
-    deployments: renderDeployments,
-    services:    renderServices,
-    events:      renderEvents,
-    silences:    renderSilences,
-    channels:    renderChannels,
-    settings:    renderSettings,
-  };
+  // ----- App / route state -----
+  let activeApp = 'incidents';      // 'incidents' | 'admin'
+  let activeRoute = 'overview';
+  let activeSeverity = '';
+  let lastSummary = null;
+
+  const incidentRoutes = { overview: renderOverview, issues: renderIssues, changes: renderChanges, workloads: renderWorkloads, deployments: renderDeployments, services: renderServices };
+  const adminRoutes = { clusters: renderClusters, users: renderUsers, audit: renderAudit, channels: renderChannels, settings: renderSettings };
   const titles = {
-    overview: 'Overview', issues: 'Issues', changes: 'What changed',
-    audit: 'Audit log', users: 'Users',
-    anomalies: 'Anomalies', workloads: 'Workloads',
-    incidents: 'Incidents', deployments: 'Deployments', services: 'Services',
-    events: 'Events', silences: 'Silences', channels: 'Channels', settings: 'Settings',
+    overview:'Overview', issues:'Issues', changes:'What changed',
+    workloads:'Workloads', deployments:'Deployments', services:'Services',
+    clusters:'Clusters', users:'Users', audit:'Audit log', channels:'Channels', settings:'Settings',
   };
+  const staticPages = new Set(['users','settings','channels','audit','clusters']);
 
-  let activeRoute = 'issues';
-  let activeSeverity = ''; // empty = all
-  let showLow = false;     // collapse low-severity in the anomalies list by default
-
-  // Pages with form inputs / interactive state — these should ONLY
-  // render on navigation, never on the polling tick (otherwise the
-  // user's typing disappears every 5 seconds).
-  const staticPages = new Set(['users', 'settings', 'channels', 'audit']);
-  $$('.nav-item').forEach(n => n.addEventListener('click', e => {
+  // App switcher
+  $$('[data-app]').forEach(n => n.addEventListener('click', e => {
     e.preventDefault();
-    const r = n.dataset.route;
-    if (r) navigate(r);
+    switchApp(n.dataset.app);
   }));
+
+  // Route switcher
+  $$('[data-route]').forEach(n => n.addEventListener('click', e => {
+    e.preventDefault();
+    navigate(n.dataset.route);
+  }));
+
+  function switchApp(app) {
+    activeApp = app;
+    // Highlight app entry
+    $$('[data-app]').forEach(n => n.classList.toggle('active', n.dataset.app === app));
+    // Toggle nav blocks
+    $('#incidents-nav').style.display = app === 'incidents' ? '' : 'none';
+    $('#admin-nav').style.display = app === 'admin' ? '' : 'none';
+    // Default landing per app
+    activeRoute = (app === 'incidents') ? 'overview' : 'clusters';
+    $$('[data-route]').forEach(n => n.classList.toggle('active', n.dataset.route === activeRoute));
+    rerender();
+  }
 
   function navigate(r) {
     activeRoute = r;
-    activeSeverity = '';
-    lastRenderSig = null;       // force a fresh render on route change
-    $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.route === r));
-    $('#page-title').textContent = titles[r] || r;
-    rerender(true);
+    $$('[data-route]').forEach(n => n.classList.toggle('active', n.dataset.route === r));
+    rerender();
   }
 
-  // -------------- polling + render gating --------------
-  // We poll the summary every 5s (slow, just to update topbar counts +
-  // detect new anomalies) and only re-render the heavy page content
-  // when the data signature actually changes. Relative timestamps in
-  // existing cards are refreshed in place every 30s.
-  let lastSummary = null;
-  let lastRenderSig = null;
-
-  function summarySig(sum) {
-    if (!sum) return 'null';
-    const sev = sum.by_severity || {};
-    return [
-      sum.total,
-      sev.critical, sev.high, sev.medium, sev.low,
-      (sum.top_workloads||[]).map(w => w.workload.name + ':' + w.anomaly_count).join('|'),
-      (sum.recent_deployments||[]).map(d => d.workload.name + ':' + d.caused_anomalies).join('|'),
-    ].join('#');
-  }
-
+  // Tick + smart re-render gating
+  let lastSig = null;
   async function tick() {
     try {
       const sum = await api.summary();
       lastSummary = sum;
-      $('#topbar-count').textContent = `${sum.total} issues`;
-      $('#topbar-time').textContent = new Date().toLocaleTimeString();
-      const navIss = $('#nav-issues-count'); if (navIss) navIss.textContent = sum.total;
-      $('#bell-count').textContent = sum.total;
-      $('#bell-count').style.display = sum.total ? 'inline-block' : 'none';
+      // status pill
+      const pill = $('#status-pill'), st = $('#status-text');
+      pill.classList.remove('warn','crit');
+      if (sum.high_risk_count > 0) { pill.classList.add('crit'); st.textContent = `${sum.high_risk_count} high-risk`; }
+      else if (sum.total > 0)      { pill.classList.add('warn'); st.textContent = `${sum.total} issues`; }
+      else                         { st.textContent = 'All OK'; }
+      const navN = $('#nav-issues-count');
+      if (navN) navN.textContent = sum.total || '';
     } catch(e) {
-      $('#topbar-time').textContent = 'detector unreachable';
-      return;
+      $('#status-text').textContent = 'detector unreachable';
     }
-    // Static-form routes (Users, Settings, Channels, Audit log)
-    // never re-render on the polling tick — that would destroy any
-    // half-typed input. They only render when the user navigates to
-    // them or when an action button explicitly triggers it.
     if (staticPages.has(activeRoute)) return;
-
-    // Only redraw if the meaningful state changed.
-    const sig = activeRoute + '|' + activeSeverity + '|' + summarySig(lastSummary);
-    if (sig !== lastRenderSig) {
-      lastRenderSig = sig;
-      rerender(false);
+    const sig = activeApp + '|' + activeRoute + '|' + activeSeverity + '|' +
+      (lastSummary ? `${lastSummary.total}:${(lastSummary.by_severity||{}).high||0}:${(lastSummary.by_severity||{}).critical||0}` : '');
+    if (sig !== lastSig) {
+      lastSig = sig;
+      rerender();
     }
   }
-  async function rerender(force) {
+  async function rerender() {
     try {
-      await routes[activeRoute]();
+      const routes = activeApp === 'incidents' ? incidentRoutes : adminRoutes;
+      const fn = routes[activeRoute] || routes[Object.keys(routes)[0]];
+      await fn();
     } catch (e) {
-      $('#main').innerHTML = '<div class="empty">Error: ' + escapeHTML(e.message) + '</div>';
+      $('#main').innerHTML = `<div class="empty">Error: ${escapeHTML(e.message)}</div>`;
     }
-  }
-
-  // Refresh "X min ago" timestamps in place without redrawing cards.
-  function refreshRelativeTimes() {
-    $$('[data-fired]').forEach(node => {
-      node.textContent = fmtAgo(node.dataset.fired);
-    });
   }
 
   tick();
   setInterval(tick, 5000);
-  setInterval(refreshRelativeTimes, 30000);
 
-  // -------------- Overview (hero incident + deployment impact + smart rec) --------------
+  // -------------- INCIDENTS APP PAGES --------------
+
   async function renderOverview() {
     const sum = lastSummary || await api.summary();
-    const m = $('#main');
-    m.innerHTML = '';
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Overview', [['View on GitHub', 'https://github.com/Avnshrai/podpulse', false]]));
 
-    // 1. HERO: top-of-page status. Either "1 active incident" or "Healthy".
-    m.append(heroStatus(sum));
-
-    // 2. Stat row: actionable counts.
-    m.append(statRow(sum));
-
-    // 3. Two-col grid: Primary incident card + Deployment impact panel.
-    const grid = el('div','ov-grid');
-    grid.append(primaryIncidentCard(sum), deploymentImpactCard(sum));
-    m.append(grid);
-
-    // 4. Smart recommendation card.
-    if (sum.recommendations && sum.recommendations.length) {
-      m.append(recommendationCard(sum.recommendations[0]));
-    }
-
-    // 5. Trends sparkline.
-    const trend = el('div','pcard');
-    trend.append(el('h3','','Anomaly trend'));
-    trend.append(sparkline(sum.sparkline));
-    m.append(trend);
-
-    renderRail(sum);
-  }
-
-  function heroStatus(sum) {
-    const high = sum.high_risk_count || 0;
-    const active = sum.active_count || 0;
-    const primary = sum.primary_incident;
-
-    let cls = 'hero calm';
-    let h2 = 'All clear';
-    let lede = `No active incidents in the last 6 hours.`;
-    if (primary) {
-      const sev = primary.severity || 'medium';
-      cls = 'hero ' + (sev === 'critical' ? 'crit' : sev === 'high' ? 'high' : sev === 'medium' ? 'med' : sev === 'low' ? 'low' : '');
-      const incCount = high > 0 ? high : 1;
-      h2 = `${incCount} active ${incCount === 1 ? 'incident' : 'incidents'}`;
-      lede = `${active} active · ${high} high-risk · ${sum.low_count || 0} low-impact`;
-    } else if (sum.total > 0) {
-      cls = 'hero low';
-      h2 = `${sum.total} anomalies, none critical`;
-      lede = `Most are low-impact. Review the list when you have time.`;
-    }
-    const hero = el('div', cls);
-    hero.append(el('h2','', h2), el('div','lede', escapeHTML(lede)));
-    return hero;
-  }
-
-  function statRow(sum) {
-    const row = el('div','stat-row');
-    const high = sum.high_risk_count || 0;
-    const cells = [
-      ['crit', high, `High-risk ${high === 1 ? 'issue' : 'issues'}`],
-      ['warn', (sum.recent_deployments||[]).filter(d => d.issue_detected).length, 'Deployments with issues'],
-      ['ok', (sum.recent_deployments||[]).filter(d => !d.issue_detected).length, 'Healthy deployments'],
-    ];
-    cells.forEach(([cls,n,l]) => {
-      const c = el('div', `stat-cell ${cls}`);
-      c.innerHTML = `<div class="n">${n}</div><div class="l">${l}</div>`;
-      row.append(c);
-    });
-    return row;
-  }
-
-  function primaryIncidentCard(sum) {
-    const card = el('div','pcard');
-    card.style.borderLeft = '4px solid var(--high)';
-    const p = sum.primary_incident;
-    if (!p) {
-      card.append(el('h3','','Primary incident'));
-      card.append(el('div','empty','No active incident — cluster looks calm.'));
-      return card;
-    }
-    const sev = p.severity || 'medium';
-    card.style.borderLeftColor = `var(--${sev})`;
-    const headRow = el('div');
-    headRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:8px';
-    headRow.append(el('h3','','Primary incident'));
-    if (p.urgency) {
-      const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[p.urgency] || p.urgency;
-      headRow.append(el('span', `urg ${p.urgency}`, urgLbl));
-    }
-    card.append(headRow);
-
-    // Three-tier headline
-    const tier1 = el('div','h-tier1');
-    tier1.innerHTML = escapeHTML(p.human_headline || p.headline || 'Anomaly');
-    card.append(tier1);
-    if (p.technical_headline) card.append(el('div','h-tier2', escapeHTML(p.technical_headline)));
-
-    const path = el('div');
-    path.style.cssText = 'font-family:ui-monospace,monospace;color:var(--muted);font-size:12px;margin:8px 0 10px';
-    path.textContent = wlPath(p.workload);
-    card.append(path);
-
-    if (p.short_story) {
-      const s = el('div'); s.textContent = p.short_story; s.style.marginBottom='10px';
-      card.append(s);
-    }
-
-    // Impact label + blast + TTD line
-    const stats = el('div');
-    stats.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:12.5px;margin-bottom:8px';
-    const impCls = ({low:'low', medium:'med', high:'high', critical:'crit'})[p.impact_level || 'low'] || 'low';
-    const impLabel = ({low:'LOW', medium:'MEDIUM', high:'HIGH', critical:'CRITICAL'})[p.impact_level || 'low'] || 'LOW';
-    stats.append(el('span', `imp-label ${impCls}`, `Impact: ${impLabel}`));
-    stats.append(blastRadius(p.affected_pods, sev));
-    if (p.time_to_detection_seconds) stats.append(el('span','',`Detected ${humSecs(p.time_to_detection_seconds)} after rollout`));
-    card.append(stats);
-
-    // Before vs After mini-panel
-    if (p.before_after) {
-      const ba = p.before_after;
-      const panel = el('div','ba-panel');
-      panel.innerHTML = `
-        <div class="ba-cell"><div class="l">Before</div><div class="n ${ba.before>0?'bad':'ok'}">${ba.before}</div><div class="s">errors</div></div>
-        <div class="ba-cell"><div class="l">After</div><div class="n ${ba.after>0?'bad':'ok'}">${ba.after}${ba.after>ba.before?' ↑':''}</div><div class="s">errors</div></div>
-        <div class="ba-change"><div class="v${ba.change_pct<0?' inf':''}">${ba.change_pct<0?'+∞%':((ba.change_pct>=0?'+':'')+ba.change_pct+'%')}</div><div class="l">change</div></div>
-      `;
-      card.append(panel);
-    }
-
-    if (p.confidence) {
-      const conf = el('div','a-confidence');
-      conf.style.marginTop = '10px';
-      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${p.confidence}%"></div></div><strong>${p.confidence}%</strong>`;
-      card.append(conf);
-    }
-
-    // actions
-    const acts = el('div');
-    acts.style.cssText = 'display:flex;gap:8px;margin-top:14px';
-    const view = el('button','btn primary','Investigate');
-    view.onclick = () => showDetails(p.id);
-    acts.append(view);
-    if (p.deployment_correlated) {
-      const rb = el('button','btn','Rollback');
-      rb.onclick = () => showRollbackModal(p);
-      acts.append(rb);
-    }
-    const ack = el('button','btn ghost','Mark resolved');
-    ack.onclick = () => doAction(p.id, 'resolve');
-    acts.append(ack);
-    card.append(acts);
-    return card;
-  }
-
-  function deploymentImpactCard(sum) {
-    const card = el('div','deploy-card');
-    card.append(el('h3','','Deployment impact'));
-    card.append(el('div','sub','Last 24 hours · did this deploy break something?'));
-    const list = sum.recent_deployments || [];
-    if (!list.length) {
-      card.append(el('div','empty','No rollouts.'));
-      return card;
-    }
-    list.slice(0, 6).forEach(d => {
-      const row = el('div','deploy-row');
-      const bad = d.issue_detected;
-      const dot = el('div', `dot ${bad?'bad':'ok'}`);
-      const body = el('div','body');
-      body.innerHTML = `<div class="name">${escapeHTML(d.workload.name)}</div><div class="sub">${fmtTime(d.when)}${d.commit?` · ${escapeHTML(d.commit.slice(0,7))}`:''} · ${escapeHTML(d.workload.namespace)}</div>`;
-      const badge = el('div', `badge ${bad?'bad':'ok'}`,
-        bad ? `Caused ${d.caused_anomalies} ${d.caused_anomalies===1?'anomaly':'anomalies'}` : 'Healthy');
-      row.append(dot, body, badge);
-      card.append(row);
-    });
-    return card;
-  }
-
-  function recommendationCard(rec) {
-    const card = el('div','rec-card');
-    card.append(el('h3','','Recommended action'));
-    card.append(el('div','rec-title', escapeHTML(rec.title || 'Investigate')));
-    card.append(el('div','rec-reason', escapeHTML(rec.reason || '')));
-    if (rec.confidence) {
-      const conf = el('div','a-confidence');
-      conf.style.marginTop = '0';
-      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${rec.confidence}%"></div></div><strong>${rec.confidence}%</strong>`;
-      card.append(conf);
-    }
-    if (rec.command) {
-      const acts = el('div');
-      acts.style.cssText = 'display:flex;gap:8px;margin-top:14px';
-      const run = el('button','btn primary','Show command');
-      run.onclick = () => showCommandModal(rec.title, rec.command);
-      acts.append(run);
-      if (rec.anomaly_id) {
-        const view = el('button','btn','View incident');
-        view.onclick = () => showDetails(rec.anomaly_id);
-        acts.append(view);
-      }
-      card.append(acts);
-    }
-    return card;
-  }
-
-  function blastRadius(podCount, sev) {
-    podCount = podCount || 1;
-    const wrap = el('span', `blast ${sev==='critical'?'crit':sev==='medium'?'med':sev==='low'?'low':''}`);
-    const total = 4;
-    const lit = Math.min(total, Math.max(1, Math.ceil(podCount / 2)));
-    for (let i = 0; i < total; i++) {
-      const d = el('span', i < lit ? 'b on' : 'b');
-      wrap.append(d);
-    }
-    const lbl = el('span', '', podCount === 1 ? '1 pod' : `${podCount} pods`);
-    lbl.style.cssText = 'margin-left:6px;color:var(--muted)';
-    wrap.append(lbl);
-    return wrap;
-  }
-
-  function humSecs(s) {
-    if (s < 60) return s + ' sec';
-    if (s < 3600) return Math.round(s/60) + ' min';
-    return Math.round(s/3600) + ' hr';
-  }
-
-  function showCommandModal(title, cmd) {
-    const shade = el('div','modal-shade');
-    const m = el('div','modal');
-    m.innerHTML = `
-      <h3>${escapeHTML(title)}</h3>
-      <div class="rec-reason">Copy this command and run it from your shell with kubectl access. PodPulse never executes infrastructure commands automatically.</div>
-      <div class="cmd">${escapeHTML(cmd)}</div>
-      <div class="actions">
-        <button class="btn" id="cm-copy">Copy</button>
-        <button class="btn ghost" id="cm-close">Close</button>
+    // Welcome banner (Neon-style)
+    const banner = el('div','info-banner');
+    banner.innerHTML = `
+      <h3>PodPulse incidents <span class="dismiss" onclick="this.parentElement.parentElement.remove()">Dismiss</span></h3>
+      <div class="card-grid">
+        <div class="grid-card"><h4><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> Issues</h4><p>One ranked feed of log anomalies, ConfigMap diffs, and K8s events. The decision-shaped view.</p></div>
+        <div class="grid-card"><h4><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h12"/></svg> What changed</h4><p>Chronological list of every deploy, configmap edit, and observed issue across the cluster.</p></div>
+        <div class="grid-card"><h4><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4z"/></svg> Workloads</h4><p>Every Deployment / StatefulSet / DaemonSet in the cluster with anomaly counts.</p></div>
+        <div class="grid-card"><h4><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v18l7-5 7 5V3z"/></svg> Deployments</h4><p>Recent rollouts, with the "did this deploy break something?" badge.</p></div>
       </div>`;
-    shade.append(m);
-    shade.onclick = e => { if (e.target === shade) shade.remove(); };
-    document.body.append(shade);
-    m.querySelector('#cm-copy').onclick = async () => {
-      try { await navigator.clipboard.writeText(cmd); toast('Copied'); }
-      catch(_) { toast('Copy failed — select manually'); }
-    };
-    m.querySelector('#cm-close').onclick = () => shade.remove();
+    m.append(banner);
+
+    // Big stats
+    const sev = sum.by_severity || {};
+    const stats = el('div','big-stats');
+    stats.innerHTML = `
+      <div class="big-stat"><div class="l">Total <i>(last 6h)</i></div><div class="v">${sum.total||0}</div></div>
+      <div class="big-stat"><div class="l">High-risk</div><div class="v" style="color:var(--high)">${sev.high||0}</div></div>
+      <div class="big-stat"><div class="l">Critical</div><div class="v" style="color:var(--critical)">${sev.critical||0}</div></div>
+      <div class="big-stat"><div class="l">Low</div><div class="v" style="color:var(--low)">${sev.low||0}</div></div>
+    `;
+    m.append(stats);
+
+    // Primary incident card
+    if (sum.primary_incident) {
+      const p = sum.primary_incident;
+      const card = el('div','pcard');
+      card.style.borderLeft = `2px solid var(--${sevColor(p.severity)})`;
+      card.innerHTML = `
+        <div class="a-top">
+          <span class="a-tag">PRIMARY INCIDENT</span>
+          <span class="a-path">${escapeHTML(wlPath(p.workload))}</span>
+          <span class="a-sev">${(p.severity||'').toUpperCase()}</span>
+        </div>
+        <div class="h-tier1">${escapeHTML(p.human_headline||'Anomaly')}</div>
+        ${p.technical_headline ? `<div class="h-tier2">${escapeHTML(p.technical_headline)}</div>`:''}
+        ${p.short_story ? `<div class="a-story">${escapeHTML(p.short_story)}</div>`:''}
+        ${p.confidence ? `<div class="a-confidence"><span>Confidence</span><div class="bar"><div style="width:${p.confidence}%"></div></div><strong>${p.confidence}%</strong></div>`:''}
+      `;
+      const acts = el('div','a-actions');
+      const view = el('button','btn primary','Investigate');
+      view.onclick = () => showIssueModal(p.id);
+      acts.append(view);
+      card.append(acts);
+      m.append(card);
+    } else {
+      const calm = el('div','pcard');
+      calm.innerHTML = `<h2>All clear</h2><div class="sub">No active incidents in the last 6 hours.</div>`;
+      m.append(calm);
+    }
+
+    // Recent deployments
+    if ((sum.recent_deployments||[]).length) {
+      const card = el('div','pcard');
+      card.append(el('h2','','Recent deployments'));
+      card.append(el('div','sub','Last 24 hours · "did this deploy break something?"'));
+      sum.recent_deployments.forEach(d => {
+        const r = el('div','row-line');
+        const tag = d.issue_detected
+          ? `<span style="color:var(--high)">Caused ${d.caused_anomalies}</span>`
+          : `<span style="color:var(--low)">Healthy</span>`;
+        r.innerHTML = `<div><strong>${escapeHTML(d.workload.name)}</strong> <span class="meta">· ${escapeHTML(d.workload.namespace)} · ${fmtTime(d.when)}</span></div><div>${tag}</div>`;
+        card.append(r);
+      });
+      m.append(card);
+    }
   }
 
-  function showRollbackModal(a) {
-    const wl = a.workload;
-    const cmd = `kubectl rollout undo ${(wl.kind||'deployment').toLowerCase()}/${wl.name} -n ${wl.namespace}`;
-    showCommandModal(`Rollback ${wl.name}`, cmd);
-  }
-
-  // -------------- Issues (root cause first) --------------
   async function renderIssues() {
+    const sum = lastSummary || await api.summary();
     const data = await api.issues({});
-    const sum = lastSummary;
-    const m = $('#main');
-    m.innerHTML = '';
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Issues'));
 
-    if (sum) $('#nav-issues-count').textContent = (data.issues||[]).length;
-
-    // Severity tabs (reuse summary breakdown).
     const tabs = el('div','tabs');
-    const allTab = el('div','tab' + (activeSeverity===''?' active':''),
-      `All issues <span class="num">${(data.issues||[]).length}</span>`);
-    allTab.onclick = () => { activeSeverity=''; rerender(true); };
-    tabs.append(allTab);
+    const all = el('div','tab' + (activeSeverity===''?' active':''),
+      `All <span class="num">${(data.issues||[]).length}</span>`);
+    all.onclick = () => { activeSeverity=''; lastSig=null; rerender(); };
+    tabs.append(all);
     [['critical','crit'],['high','high'],['medium','med'],['low','low']].forEach(([k,c]) => {
-      const t = el('div',`tab ${c}` + (activeSeverity===k?' active':''),
-        `<div class="dot"></div> ${k[0].toUpperCase()+k.slice(1)} <span class="num">${(sum && sum.by_severity || {})[k]||0}</span>`);
-      t.onclick = () => { activeSeverity = (activeSeverity===k?'':k); rerender(true); };
+      const t = el('div',`tab` + (activeSeverity===k?' active':''),
+        `<span class="sevdot ${k}"></span>${k[0].toUpperCase()+k.slice(1)} <span class="num">${(sum.by_severity||{})[k]||0}</span>`);
+      t.onclick = () => { activeSeverity = (activeSeverity===k?'':k); lastSig=null; rerender(); };
       tabs.append(t);
     });
     m.append(tabs);
 
-    if (!data.issues || data.issues.length === 0) {
-      m.append(el('div','empty','<div class="pulse-dot"></div>No issues. Cluster looks calm.'));
+    let issues = (data.issues||[]).slice();
+    if (activeSeverity) issues = issues.filter(i => i.severity === activeSeverity);
+    if (issues.length === 0) {
+      m.append(el('div','empty','No issues match this filter.'));
     } else {
-      // Group: high-severity first; collapse low.
-      let issues = data.issues;
-      if (activeSeverity) issues = issues.filter(i => i.severity === activeSeverity);
-      const high = issues.filter(i => i.severity !== 'low');
-      const low = issues.filter(i => i.severity === 'low');
-      const showingLow = activeSeverity === 'low' || showLow;
-      high.forEach(iss => m.append(issueCard(iss)));
-      if (!showingLow && low.length > 0) {
-        const fold = el('div','low-fold',
-          `${low.length} low-impact issue${low.length===1?'':'s'} hidden — click to expand`);
-        fold.onclick = () => { showLow = true; rerender(true); };
-        m.append(fold);
-      } else {
-        low.forEach(iss => m.append(issueCard(iss)));
-      }
+      issues.forEach(i => m.append(issueCard(i)));
     }
-    renderRail(sum);
   }
 
   function issueCard(iss) {
-    const sev = sevColor(iss.severity);
-    const card = el('div', `a-card sev-${sev}`);
-
-    // Top row: type tag + urgency + workload path + severity
-    const top = el('div','a-top');
-    const typeLabels = {
-      log_anomaly:  'LOG ANOMALY',
-      config_issue: 'CONFIG ISSUE',
-      crash_loop:   'CRASH LOOP',
-      scheduling:   'SCHEDULING',
-    };
-    top.append(el('span', 'a-tag', typeLabels[iss.type] || iss.type.toUpperCase()));
-    if (iss.urgency) {
-      const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[iss.urgency] || iss.urgency;
-      top.append(el('span', `urg ${iss.urgency}`, urgLbl));
-    }
-    top.append(el('span','a-path', escapeHTML(wlPath(iss.workload))));
-    top.append(el('span','a-sev', sevPretty(iss.severity)));
-    card.append(top);
-
-    // Headlines (3-tier: human → technical → raw)
-    card.append(el('div','h-tier1', escapeHTML(iss.human_headline || 'Issue')));
-    if (iss.technical_headline) card.append(el('div','h-tier2', escapeHTML(iss.technical_headline)));
-    if (iss.short_story) card.append(el('div','a-story', escapeHTML(iss.short_story)));
-
-    // Type-specific body
-    if (iss.type === 'config_issue' && iss.config_issue) renderConfigIssueBody(card, iss);
-    if (iss.type === 'crash_loop' && iss.crash_loop) renderCrashBody(card, iss);
-    if (iss.type === 'scheduling' && iss.scheduling) renderSchedBody(card, iss);
-    if (iss.type === 'log_anomaly' && iss.log_anomaly) renderLogBody(card, iss);
-
-    // Common: impact + ttd
-    const meta = el('div','a-meta');
-    const impact = el('div','a-impact');
-    const impCls = ({low:'low', medium:'med', high:'high', critical:'crit'})[iss.impact_level || 'low'] || 'low';
-    const impLabel = ({low:'LOW', medium:'MEDIUM', high:'HIGH', critical:'CRITICAL'})[iss.impact_level || 'low'] || 'LOW';
-    const r1 = el('div','row');
-    r1.append(el('span', `imp-label ${impCls}`, `Impact: ${impLabel}`));
-    impact.append(r1);
-    if (iss.affected_pods) {
-      const r2 = el('div','row');
-      r2.append(blastRadius(iss.affected_pods, iss.severity));
-      impact.append(r2);
-    }
-    const times = el('div','a-times', `<div class="ago">${fmtTime(iss.fired_at)}</div><div data-fired="${iss.fired_at}">${fmtAgo(iss.fired_at)}</div>`);
-    meta.append(impact, times);
-    card.append(meta);
-
-    // Confidence + factors
-    if (iss.confidence) {
-      const conf = el('div','a-confidence');
-      conf.innerHTML = `<span>Confidence</span><div class="bar"><div style="width:${iss.confidence}%"></div></div><strong>${iss.confidence}%</strong>`;
-      card.append(conf);
-      if (iss.confidence_factors && iss.confidence_factors.length) {
-        const ex = el('div','conf-explain');
-        ex.innerHTML = `Based on:<ul>${iss.confidence_factors.map(f => `<li>${escapeHTML(f)}</li>`).join('')}</ul>`;
-        card.append(ex);
-      }
-    }
-
-    // What happened
-    if (iss.what_happened) {
-      const nar = el('div','narrative');
-      nar.innerHTML = `<h4>What happened</h4>${escapeHTML(iss.what_happened)}` +
-        (iss.likely_cause ? `<div class="cause"><strong>Likely cause:</strong> ${escapeHTML(iss.likely_cause)}</div>` : '');
-      card.append(nar);
-    }
-
-    // Timeline ("what changed")
-    if (iss.timeline && iss.timeline.length) {
-      const tl = el('div','a-timeline');
-      iss.timeline.forEach((step, i) => {
-        if (i > 0) tl.append(el('span','arrow','→'));
-        const s = el('span','step');
-        s.innerHTML = `<strong>${fmtTime(step.when)}</strong> ${escapeHTML(step.label)}`;
-        tl.append(s);
-      });
-      card.append(tl);
-    }
-
-    // Actions
+    const card = el('div',`a-card sev-${sevColor(iss.severity)}`);
+    const typeLabel = ({log_anomaly:'LOG ANOMALY', config_issue:'CONFIG ISSUE', crash_loop:'CRASH LOOP', scheduling:'SCHEDULING'})[iss.type] || iss.type.toUpperCase();
+    card.innerHTML = `
+      <div class="a-top">
+        <span class="a-tag">${typeLabel}</span>
+        <span class="a-path">${escapeHTML(wlPath(iss.workload))}</span>
+        <span class="a-sev">${(iss.severity||'').toUpperCase()}</span>
+      </div>
+      <div class="h-tier1">${escapeHTML(iss.human_headline||'Issue')}</div>
+      ${iss.technical_headline ? `<div class="h-tier2">${escapeHTML(iss.technical_headline)}</div>`:''}
+      ${iss.short_story ? `<div class="a-story">${escapeHTML(iss.short_story)}</div>`:''}
+      ${iss.confidence ? `<div class="a-confidence"><span>Confidence</span><div class="bar"><div style="width:${iss.confidence}%"></div></div><strong>${iss.confidence}%</strong></div>`:''}
+    `;
     const acts = el('div','a-actions');
-    const view = el('button','btn primary','Investigate');
-    view.onclick = () => showIssueModal(iss.id);
-    acts.append(view);
-    const sil = el('button','btn','Silence');
-    sil.onclick = () => doIssueAction(iss.id, 'silence');
-    const res = el('button','btn','Mark resolved');
-    res.onclick = () => doIssueAction(iss.id, 'resolve');
-    const ign = el('button','btn ghost','Ignore');
-    ign.onclick = () => doIssueAction(iss.id, 'ignore');
-    acts.append(sil, res, ign);
+    const view = el('button','btn primary','Investigate'); view.onclick = () => showIssueModal(iss.id); acts.append(view);
+    const sil = el('button','btn','Silence'); sil.onclick = () => doIssueAction(iss.id, 'silence'); acts.append(sil);
+    const res = el('button','btn ghost','Resolve'); res.onclick = () => doIssueAction(iss.id, 'resolve'); acts.append(res);
     card.append(acts);
-
-    // Numbered next steps
-    if (iss.suggested_fix && iss.suggested_fix.length) {
-      const steps = el('div','steps');
-      steps.append(el('h4','','Next steps'));
-      iss.suggested_fix.slice(0, 3).forEach((s, i) => {
-        const row = el('div','step');
-        row.append(el('div','step-num', String(i+1)));
-        const body = el('div','step-body');
-        body.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>` +
-          (s.answer ? `<div class="why" style="color:var(--text);font-size:13px;white-space:pre-line;margin-top:4px">${escapeHTML(s.answer)}</div>` : '') +
-          (s.command ? `<code>${escapeHTML(s.command)}</code>` : '') +
-          (s.why ? `<div class="why">${escapeHTML(s.why)}</div>` : '');
-        row.append(body);
-        steps.append(row);
-      });
-      if (iss.suggested_fix.length > 3) {
-        steps.append(el('div','why', `+${iss.suggested_fix.length-3} more in details`));
-      }
-      card.append(steps);
-    }
-
     return card;
   }
 
-  function renderConfigIssueBody(card, iss) {
-    const c = iss.config_issue;
-    const panel = el('div','ba-panel');
-    panel.style.gridTemplateColumns = '1fr';
-    let body = `<div class="l">Changes detected</div>`;
-    body += '<div style="margin-top:6px;font-size:13px;line-height:1.6">';
-    (c.changes||[]).forEach(ch => {
-      let line = `<code style="color:var(--accent);font-family:ui-monospace,monospace">${escapeHTML(ch.key)}</code>`;
-      if (ch.type === 'value_changed' && (ch.old_value || ch.new_value)) {
-        line += ` <span style="color:var(--muted)">"${escapeHTML(ch.old_value||'')}" → "${escapeHTML(ch.new_value||'')}"</span>`;
-      } else if (ch.type === 'became_empty') {
-        line += ` <span style="color:var(--high)">→ empty</span>`;
-        if (ch.old_value) line += ` <span style="color:var(--muted)">(was "${escapeHTML(ch.old_value)}")</span>`;
-      } else if (ch.type === 'malformed_json') {
-        line += ` <span style="color:var(--critical)">→ ${escapeHTML(ch.note||'invalid JSON')}</span>`;
-      } else if (ch.type === 'removed') {
-        line += ` <span style="color:var(--high)">→ removed</span>`;
-      }
-      body += `<div>${line}</div>`;
-    });
-    body += '</div>';
-    if (c.mounts && c.mounts.length) {
-      body += `<div class="l" style="margin-top:10px">Pods that mount this</div>`;
-      body += '<div style="margin-top:4px;font-size:13px">';
-      c.mounts.slice(0, 5).forEach(m => {
-        body += `<div>• <strong>${escapeHTML(m.owner_kind)}/${escapeHTML(m.owner_name)}</strong> in ${escapeHTML(m.namespace)}</div>`;
-      });
-      if (c.mounts.length > 5) body += `<div style="color:var(--muted)">+${c.mounts.length-5} more</div>`;
-      body += '</div>';
-    }
-    panel.innerHTML = body;
-    card.append(panel);
-  }
-
-  function renderCrashBody(card, iss) {
-    const c = iss.crash_loop;
-    const panel = el('div','ba-panel');
-    panel.innerHTML = `
-      <div class="ba-cell"><div class="l">Reason</div><div class="n bad" style="font-size:18px">${escapeHTML(c.reason||'unknown')}</div><div class="s">k8s event reason</div></div>
-      <div class="ba-cell"><div class="l">Restarts</div><div class="n bad">${c.restarts||0}</div><div class="s">in window</div></div>
-      <div class="ba-change"><div class="v">${escapeHTML(iss.pod||'')}</div><div class="l">pod</div></div>
-    `;
-    card.append(panel);
-    if (c.last_event) {
-      const ev = el('div','narrative');
-      ev.style.borderLeftColor = 'var(--critical)';
-      ev.innerHTML = `<h4>Last K8s event</h4><code style="font-size:12px;color:var(--text);background:transparent;padding:0">${escapeHTML(c.last_event)}</code>`;
-      card.append(ev);
-    }
-  }
-
-  function renderSchedBody(card, iss) {
-    const s = iss.scheduling;
-    const ev = el('div','narrative');
-    ev.style.borderLeftColor = 'var(--high)';
-    ev.innerHTML = `<h4>Scheduler said</h4><code style="font-size:12px;color:var(--text);background:transparent;padding:0">${escapeHTML(s.message||s.reason||'')}</code>`;
-    card.append(ev);
-  }
-
-  function renderLogBody(card, iss) {
-    const l = iss.log_anomaly;
-    if (l.before_after) {
-      const ba = l.before_after;
-      const panel = el('div','ba-panel');
-      panel.innerHTML = `
-        <div class="ba-cell"><div class="l">Before deploy</div><div class="n ${ba.before>0?'bad':'ok'}">${ba.before}</div><div class="s">errors of this kind</div></div>
-        <div class="ba-cell"><div class="l">After deploy</div><div class="n ${ba.after>0?'bad':'ok'}">${ba.after}${ba.after>ba.before?' ↑':''}</div><div class="s">errors of this kind</div></div>
-        <div class="ba-change"><div class="v${ba.change_pct<0?' inf':''}">${ba.change_pct<0?'+∞%':((ba.change_pct>=0?'+':'')+ba.change_pct+'%')}</div><div class="l">change</div></div>
-      `;
-      card.append(panel);
-    }
-    if (l.template) {
-      card.append(el('div','h-tier3', escapeHTML(l.template)));
-    }
-  }
-
   async function doIssueAction(id, action) {
-    try { await api.issueState(id, action); toast(action[0].toUpperCase()+action.slice(1)+'d'); tick(); }
+    try { await api.issueState(id, action); toast(action[0].toUpperCase()+action.slice(1)+'d'); lastSig=null; tick(); }
     catch(e) { toast('Failed: '+e.message); }
   }
 
   async function showIssueModal(id) {
     try {
-      const iss = await api.issue(id);
+      const i = await api.issue(id);
       const shade = el('div','modal-shade');
       const m = el('div','modal');
-      m.style.cssText = 'max-width:780px;width:100%;max-height:85vh;overflow-y:auto;padding:24px';
       m.innerHTML = `
-        <h3 style="margin:0 0 6px;font-size:16px">${escapeHTML(iss.human_headline||'Issue')}</h3>
-        ${iss.technical_headline ? `<div style="color:var(--muted);margin-bottom:12px;font-size:12.5px">${escapeHTML(iss.technical_headline)}</div>`:''}
+        <h3>${escapeHTML(i.human_headline||'Issue')}</h3>
+        ${i.technical_headline ? `<div class="sub">${escapeHTML(i.technical_headline)}</div>`:''}
+        ${i.likely_cause ? `<div class="pcard" style="margin:12px 0"><h2>Likely cause</h2><div>${escapeHTML(i.likely_cause)}</div></div>`:''}
+        ${i.what_happened ? `<div class="pcard" style="margin:12px 0"><h2>What happened</h2><div style="color:var(--muted)">${escapeHTML(i.what_happened)}</div></div>`:''}
       `;
-      // Root cause section
-      if (iss.likely_cause) {
-        const rc = el('div','rec-card');
-        rc.innerHTML = `<h3>Likely cause</h3><div style="color:var(--muted);font-size:12.5px">${escapeHTML(iss.likely_cause)}</div>`;
-        m.append(rc);
-      }
-      // What happened
-      if (iss.what_happened) {
-        const nar = el('div','narrative');
-        nar.style.marginTop = '14px';
-        nar.innerHTML = `<h4>What happened</h4>${escapeHTML(iss.what_happened)}`;
-        m.append(nar);
-      }
-      // Timeline
-      if (iss.timeline && iss.timeline.length) {
-        const tlBox = el('div'); tlBox.style.marginTop = '16px';
-        tlBox.innerHTML = `<h4 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 8px">What changed (timeline)</h4>`;
-        const list = el('div');
-        list.style.cssText = 'border:1px solid var(--border);border-radius:4px;padding:10px 12px';
-        iss.timeline.forEach((step, i) => {
-          const row = el('div'); row.style.cssText='display:grid;grid-template-columns:60px 1fr;gap:10px;padding:4px 0;font-size:12.5px';
-          row.innerHTML = `<div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(step.when)}</div><div><strong style="font-weight:500">${escapeHTML(step.label)}</strong>${step.detail?` <span style="color:var(--muted-2)">— ${escapeHTML(step.detail)}</span>`:''}</div>`;
-          list.append(row);
+      // timeline
+      if (i.timeline && i.timeline.length) {
+        const t = el('div','pcard');
+        t.append(el('h2','','Timeline'));
+        i.timeline.forEach(s => {
+          const r = el('div','tl-row');
+          r.innerHTML = `<div style="color:var(--muted-2)">${fmtTime(s.when)}</div><div style="color:var(--muted-2);text-transform:uppercase;font-size:11px">${escapeHTML(s.kind||'')}</div><div><strong>${escapeHTML(s.label)}</strong>${s.detail?` <span class="meta">— ${escapeHTML(s.detail)}</span>`:''}</div>`;
+          t.append(r);
         });
-        tlBox.append(list);
-        m.append(tlBox);
+        m.append(t);
       }
-      // Suggested fix — full
-      if (iss.suggested_fix && iss.suggested_fix.length) {
-        const sec = el('div'); sec.style.marginTop='16px';
-        sec.innerHTML = `<h4 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 8px">Suggested fix</h4>`;
-        iss.suggested_fix.forEach((s, i) => {
-          const row = el('div','step');
-          row.append(el('div','step-num', String(i+1)));
-          const body = el('div','step-body');
-          body.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>` +
-            (s.answer ? `<div style="color:var(--text);margin-top:4px;white-space:pre-line">${escapeHTML(s.answer)}</div>` : '') +
-            (s.command ? `<code>${escapeHTML(s.command)}</code>` : '') +
-            (s.why ? `<div class="why">${escapeHTML(s.why)}</div>` : '');
+      // suggested fix
+      if (i.suggested_fix && i.suggested_fix.length) {
+        const sec = el('div','pcard');
+        sec.append(el('h2','','Suggested fix'));
+        i.suggested_fix.forEach((s, idx) => {
+          const row = el('div','step-line');
+          row.append(el('div','step-num', String(idx+1)));
+          const body = el('div'); body.innerHTML = `<div><strong>${escapeHTML(s.title)}</strong></div>${s.command?'<div class="cmd">'+escapeHTML(s.command)+'</div>':''}${s.why?'<div class="meta">'+escapeHTML(s.why)+'</div>':''}`;
           row.append(body);
           sec.append(row);
         });
         m.append(sec);
       }
-      // Type-specific raw
-      if (iss.log_anomaly && iss.log_anomaly.template) {
-        const t = el('div'); t.style.marginTop='16px';
-        t.innerHTML = `<h4 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 6px">Raw template</h4><div class="cmd">${escapeHTML(iss.log_anomaly.template)}</div>`;
-        m.append(t);
-      }
-      const closeRow = el('div','actions');
-      const close = el('button','btn ghost','Close');
-      close.onclick = () => shade.remove();
-      closeRow.append(close);
-      m.append(closeRow);
-      shade.append(m);
-      shade.onclick = e => { if (e.target === shade) shade.remove(); };
+      const acts = el('div','actions'); const close = el('button','btn ghost','Close'); close.onclick = () => shade.remove(); acts.append(close); m.append(acts);
+      shade.append(m); shade.onclick = e => { if (e.target===shade) shade.remove(); };
       document.body.append(shade);
     } catch(e) { toast('Failed: '+e.message); }
   }
 
-  // -------------- What changed (timeline page) --------------
   async function renderChanges() {
-    const data = await api.timeline({since: '6h'});
-    const m = $('#main');
-    m.innerHTML = '';
+    const data = await api.timeline({since:'6h'});
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('What changed'));
     const card = el('div','pcard');
-    card.append(el('h3','','What changed in the last 6 hours'));
-    card.append(el('div','sub','Deploys, configmap/secret edits, and observed issues — chronological.'));
-    if (!data.items || !data.items.length) {
-      card.append(el('div','empty','Nothing has changed in the last 6 hours.'));
+    card.append(el('h2','','Last 6 hours'));
+    card.append(el('div','sub','Deploys · ConfigMap edits · observed issues — chronological.'));
+    const items = (data.items || []).slice().reverse();
+    if (!items.length) {
+      card.append(el('div','empty','Nothing changed in the last 6 hours.'));
     } else {
-      const list = el('div');
-      data.items.reverse().forEach(item => {
-        const kindLbl = ({deploy:'deploy', config_change:'config', issue:'issue'})[item.kind] || item.kind;
-        const row = el('div');
-        row.style.cssText = 'display:grid;grid-template-columns:80px 80px 1fr;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px';
-        row.innerHTML = `
-          <div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(item.when)}</div>
-          <div style="color:var(--muted-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em">${kindLbl}</div>
-          <div><strong style="font-weight:500">${escapeHTML(item.label)}</strong>${item.detail?` <span style="color:var(--muted-2)">— ${escapeHTML(item.detail)}</span>`:''}</div>
-        `;
-        list.append(row);
+      items.forEach(it => {
+        const r = el('div','tl-row');
+        r.innerHTML = `<div style="color:var(--muted-2)">${fmtTime(it.when)}</div><div style="color:var(--muted-2);text-transform:uppercase;font-size:11px">${escapeHTML(it.kind||'')}</div><div><strong>${escapeHTML(it.label)}</strong>${it.detail?` <span class="meta">— ${escapeHTML(it.detail)}</span>`:''}</div>`;
+        card.append(r);
       });
-      card.append(list);
     }
     m.append(card);
-    renderRail(lastSummary);
   }
 
-  // -------------- Audit log (who changed what, when) --------------
-  let auditFilter = { only_humans: 'true', since: '6h' };
-
-  async function renderAudit() {
-    const m = $('#main');
-    m.innerHTML = '';
-
-    // Filter row.
-    const fr = el('div'); fr.style.cssText = 'display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap';
-    const onlyHumans = el('label'); onlyHumans.style.cssText='display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px';
-    onlyHumans.innerHTML = `<input type="checkbox" ${auditFilter.only_humans==='true'?'checked':''}> Only show human actors`;
-    onlyHumans.querySelector('input').onchange = e => {
-      auditFilter.only_humans = e.target.checked ? 'true' : '';
-      lastRenderSig = null; rerender(true);
-    };
-    fr.append(onlyHumans);
-    ['1h','6h','24h'].forEach(d => {
-      const b = el('button', 'btn' + (auditFilter.since===d?' primary':''), 'Last ' + d);
-      b.onclick = () => { auditFilter.since = d; lastRenderSig = null; rerender(true); };
-      fr.append(b);
+  async function renderWorkloads() {
+    const data = await api.workloads();
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Workloads'));
+    const card = el('div','pcard');
+    card.append(el('h2','',`${data.count||0} workloads observed`));
+    const t = document.createElement('table');
+    t.innerHTML = `<thead><tr><th>Namespace</th><th>Kind</th><th>Name</th><th>Pods</th><th>Anomalies</th><th>Worst</th></tr></thead><tbody></tbody>`;
+    const tb = t.querySelector('tbody');
+    (data.workloads||[]).slice(0,200).forEach(w => {
+      const tr = document.createElement('tr');
+      const sev = w.worst_severity || '';
+      tr.innerHTML = `<td>${escapeHTML(w.workload.namespace)}</td><td style="color:var(--muted-2)">${escapeHTML(w.workload.kind||'')}</td><td><strong>${escapeHTML(w.workload.name)}</strong></td><td>${w.pods}</td><td>${w.anomaly_count}</td><td>${sev?`<span class="sevdot ${sev}"></span>${sev}`:'—'}</td>`;
+      tb.append(tr);
     });
-    m.append(fr);
+    card.append(t);
+    m.append(card);
+  }
 
-    // Actor leaderboard.
-    const actorData = await api.auditActors();
-    if (actorData.actors && actorData.actors.length) {
-      const acts = el('div','pcard');
-      acts.append(el('h3','','Active actors'));
-      const grid = el('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px';
-      actorData.actors.slice(0, 12).forEach(a => {
-        const isUser = a.actor_type === 'User';
-        const card = el('div'); card.style.cssText = `background:var(--panel-2);padding:10px 12px;border-radius:8px;border-left:3px solid ${isUser?'var(--accent)':'var(--muted)'};cursor:pointer`;
-        card.innerHTML = `<div style="font-weight:600;font-size:13px;${isUser?'':'color:var(--muted)'}">${escapeHTML(a.actor)}</div><div style="font-size:11px;color:var(--muted)">${a.actor_type} · ${a.events} events · ${fmtAgo(a.last_seen)}</div>`;
-        card.onclick = () => { auditFilter.actor = a.actor; lastRenderSig = null; rerender(true); };
-        grid.append(card);
-      });
-      acts.append(grid);
-      m.append(acts);
-    }
-
-    // Event list.
-    const data = await api.audit(auditFilter);
-    if (!data.available) {
-      m.append(el('div','empty','Audit watcher not initialized (Kubernetes integration disabled).'));
-      return;
-    }
-    const list = el('div','pcard');
-    list.append(el('h3','',`Mutations${auditFilter.actor?` by ${auditFilter.actor}`:''} <span style="color:var(--muted);font-weight:400">(${data.count})</span>`));
-    if (auditFilter.actor) {
-      const clr = el('button','btn ghost','Clear filter');
-      clr.onclick = () => { delete auditFilter.actor; lastRenderSig = null; rerender(true); };
-      clr.style.marginLeft='10px';
-      list.querySelector('h3').append(clr);
-    }
-    if (!data.events || !data.events.length) {
-      list.append(el('div','empty','No mutations in this window. Either nothing has changed, or PodPulse needs a few seconds to observe a write.'));
+  async function renderDeployments() {
+    const data = await api.deployments();
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Deployments'));
+    const card = el('div','pcard');
+    card.append(el('h2','',`${data.count||0} rollouts in the last 7 days`));
+    if (!data.deployments || !data.deployments.length) {
+      card.append(el('div','empty','No rollouts recently.'));
     } else {
-      data.events.forEach(e => {
-        const row = el('div'); row.style.cssText='display:grid;grid-template-columns:80px 90px 70px 1fr 60px;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;align-items:start';
-        const actCol = ({create:'create', update:'update', delete:'delete'})[e.action] || e.action;
-        const riskCls = ({high:'high',medium:'medium',info:'low'})[e.risk] || 'low';
-        const fields = (e.fields||[]).join(', ');
+      data.deployments.forEach(d => {
+        const r = el('div','row-line');
+        const tag = d.issue_detected
+          ? `<span style="color:var(--high)">Caused ${d.caused_anomalies}</span>`
+          : `<span style="color:var(--low)">Healthy</span>`;
+        r.innerHTML = `<div><strong>${escapeHTML(d.workload.name)}</strong> <span class="meta">· ${escapeHTML(d.workload.namespace)} · ${fmtTime(d.when)}${d.commit?` · ${escapeHTML(d.commit.slice(0,7))}`:''}</span></div><div>${tag}</div>`;
+        card.append(r);
+      });
+    }
+    m.append(card);
+  }
+
+  async function renderServices() {
+    const data = await api.services();
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Services'));
+    const card = el('div','pcard');
+    card.append(el('h2','',`${data.count||0} services observed`));
+    const t = document.createElement('table');
+    t.innerHTML = `<thead><tr><th>Namespace</th><th>Name</th><th>Type</th><th>ClusterIP</th><th>Ports</th></tr></thead><tbody></tbody>`;
+    const tb = t.querySelector('tbody');
+    (data.services||[]).slice(0,200).forEach(s => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHTML(s.Namespace)}</td><td><strong>${escapeHTML(s.Name)}</strong></td><td>${escapeHTML(s.Type||'')}</td><td style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML(s.ClusterIP||'')}</td><td style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML((s.Ports||[]).join(', '))}</td>`;
+      tb.append(tr);
+    });
+    card.append(t);
+    m.append(card);
+  }
+
+  // -------------- ADMIN APP PAGES --------------
+
+  async function renderClusters() {
+    const data = await api.listClusters();
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Clusters'));
+
+    // Form
+    const form = el('div','pcard');
+    form.append(el('h2','','Register a cluster'));
+    form.append(el('div','sub','Upload a kubeconfig. PodPulse uses it to manage onboarded users in that cluster and to proxy kubectl traffic.'));
+    const grid = el('div','form-grid full');
+    grid.innerHTML = `
+      <div class="field"><label>Cluster name</label><input id="c-name" placeholder="dev-cluster-uae"></div>
+      <div class="field"><label>Description (optional)</label><input id="c-desc" placeholder="dev AKS in uaenorth"></div>
+      <div class="field"><label>kubeconfig (paste YAML)</label><textarea id="c-kube" placeholder="apiVersion: v1\nkind: Config\nclusters:\n- name: my-cluster\n  cluster:\n    server: https://...\n..."></textarea></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="c-go">Register cluster</button></div>
+    `;
+    form.append(grid);
+    grid.querySelector('#c-go').onclick = async () => {
+      const body = {
+        name:        grid.querySelector('#c-name').value.trim(),
+        description: grid.querySelector('#c-desc').value.trim(),
+        kubeconfig:  grid.querySelector('#c-kube').value,
+      };
+      if (!body.name || !body.kubeconfig) { toast('Name and kubeconfig are required'); return; }
+      try { await api.registerCluster(body); toast('Cluster registered'); lastSig=null; rerender(); }
+      catch(e) { toast('Failed: '+e.message); }
+    };
+    m.append(form);
+
+    // List
+    const list = el('div','pcard');
+    list.append(el('h2','','Registered clusters'));
+    if (!data.clusters || !data.clusters.length) {
+      list.append(el('div','empty','No clusters registered yet. Use the form above.'));
+    } else {
+      data.clusters.forEach(c => {
+        const row = el('div','cluster-card');
         row.innerHTML = `
-          <div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(e.when)}</div>
-          <div><strong style="font-weight:500">${escapeHTML(e.actor)}</strong></div>
-          <div style="color:var(--muted-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em">${actCol}</div>
-          <div>
-            <strong style="font-weight:500">${escapeHTML(e.kind)}/${escapeHTML(e.name)}</strong>
-            <span style="color:var(--muted-2)">${e.namespace?'in '+escapeHTML(e.namespace):''}</span>
-            ${fields?`<div style="color:var(--muted-2);font-size:11px;margin-top:2px">touched: ${escapeHTML(fields)}</div>`:''}
-          </div>
-          <div style="text-align:right"><span class="imp-label ${riskCls}" style="font-size:10.5px">${(e.risk||'').toUpperCase()}</span></div>
+          <div><div class="name">${escapeHTML(c.name)}</div><div class="meta">${escapeHTML(c.description||'no description')}</div></div>
+          <div class="meta" style="font-family:ui-monospace,monospace">${escapeHTML((c.apiserver_url||'').slice(0,40))}${(c.apiserver_url||'').length>40?'…':''}</div>
+          <div class="meta">added ${fmtAgo(c.created_at)}</div>
+          <div><button class="btn danger" data-id="${c.id}">Remove</button></div>
         `;
+        row.querySelector('button').onclick = async () => {
+          if (!confirm('Remove cluster ' + c.name + '?')) return;
+          await api.deleteCluster(c.id); toast('Removed'); lastSig=null; rerender();
+        };
         list.append(row);
       });
     }
     m.append(list);
-    renderRail(lastSummary);
   }
 
-  // -------------- Users (onboarding + RBAC + kubeconfig) --------------
   async function renderUsers() {
-    const m = $('#main');
     const data = await api.listUsers();
-    m.innerHTML = '';
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Users'));
 
-    // Onboard form.
     const form = el('div','pcard');
-    form.append(el('h3','','Onboard a teammate'));
-    form.append(el('div','sub','Creates a ServiceAccount + Role + RoleBinding scoped to one namespace, then issues a 1-hour kubeconfig your teammate can use immediately.'));
-    const grid = el('div'); grid.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-top:12px;align-items:end';
+    form.append(el('h2','','Onboard a teammate'));
+    form.append(el('div','sub','Creates a ServiceAccount + Role + RoleBinding scoped to one namespace. Issues a 1-hour kubeconfig.'));
+    const grid = el('div','form-grid');
     grid.innerHTML = `
-      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Name<input id="u-name" placeholder="alice" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"></label>
-      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Namespace<input id="u-ns" placeholder="dev" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"></label>
-      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Scope<select id="u-scope" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"><option value="viewer">viewer (read-only)</option><option value="developer" selected>developer (no Secret edits)</option><option value="admin">admin (in namespace)</option></select></label>
-      <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Description<input id="u-desc" placeholder="optional"  style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px"></label>
-      <button class="btn primary" id="u-go">Onboard</button>
+      <div class="field"><label>Name</label><input id="u-name" placeholder="alice"></div>
+      <div class="field"><label>Namespace</label><input id="u-ns" placeholder="dev"></div>
+      <div class="field"><label>Scope</label><select id="u-scope"><option value="viewer">viewer (read-only)</option><option value="developer" selected>developer</option><option value="admin">admin</option></select></div>
+      <div class="field"><label>Description</label><input id="u-desc" placeholder="optional"></div>
+      <div><button class="btn primary" id="u-go">Onboard</button></div>
     `;
     form.append(grid);
-    const scopeHelp = el('div'); scopeHelp.style.cssText='margin-top:8px;font-size:11.5px;color:var(--muted)';
-    scopeHelp.innerHTML = '<strong>viewer</strong>: get/list/watch on workloads + logs · <strong>developer</strong>: + create/update/delete workloads (no Secret edits) · <strong>admin</strong>: full namespaced access. PodPulse never grants cluster-admin via this flow.';
-    form.append(scopeHelp);
-    m.append(form);
-
     grid.querySelector('#u-go').onclick = async () => {
       const body = {
         name: grid.querySelector('#u-name').value.trim(),
@@ -1550,623 +1025,149 @@
         scope: grid.querySelector('#u-scope').value,
         description: grid.querySelector('#u-desc').value.trim(),
       };
-      if (!body.name || !body.namespace) { toast('Name and namespace are required'); return; }
+      if (!body.name || !body.namespace) { toast('Name and namespace required'); return; }
       try {
         const u = await api.createUser(body);
         toast('Onboarded ' + u.name);
         showKubeconfigModal(u);
-        rerender(true);
-      } catch (e) { toast('Failed: ' + e.message); }
+        lastSig=null; rerender();
+      } catch(e) { toast('Failed: '+e.message); }
     };
+    m.append(form);
 
-    // Existing users.
     const list = el('div','pcard');
-    list.append(el('h3','','Onboarded users'));
+    list.append(el('h2','','Onboarded users'));
     if (!data.users || !data.users.length) {
-      list.append(el('div','empty','No users onboarded yet. Use the form above to add one.'));
+      list.append(el('div','empty','No users onboarded yet.'));
     } else {
       data.users.forEach(u => {
-        const row = el('div'); row.style.cssText='display:grid;grid-template-columns:1fr 120px 130px 200px auto;gap:12px;padding:10px 0;border-bottom:1px dashed var(--border);align-items:center';
-        const scopeCls = u.scope==='admin'?'crit':u.scope==='developer'?'med':'low';
-        row.innerHTML = `
-          <div>
-            <div style="font-weight:600">${escapeHTML(u.name)}</div>
-            <div style="color:var(--muted);font-size:11.5px">${escapeHTML(u.description||'no description')}</div>
-          </div>
-          <div style="color:var(--muted);font-size:13px">${escapeHTML(u.namespace)}</div>
-          <div><span class="imp-label ${scopeCls}">${escapeHTML((u.scope||'').toUpperCase())}</span></div>
-          <div style="color:var(--muted);font-size:11.5px;font-family:ui-monospace,monospace">SA: ${escapeHTML(u.service_account||'')}</div>
-          <div style="display:flex;gap:6px">
-            <button class="btn primary" data-act="kube">kubeconfig</button>
-            <button class="btn" data-act="del">remove</button>
-          </div>
-        `;
-        row.querySelector('[data-act=kube]').onclick = () => showKubeconfigModal(u);
-        row.querySelector('[data-act=del]').onclick = async () => {
-          if (!confirm(`Remove ${u.name}? This deletes the SA, Role, and RoleBinding.`)) return;
-          await api.deleteUser(u.name);
-          toast('Removed ' + u.name);
-          rerender(true);
+        const r = el('div','row-line');
+        const sevCls = u.scope==='admin'?'crit':u.scope==='developer'?'med':'low';
+        r.innerHTML = `<div><strong>${escapeHTML(u.name)}</strong> <span class="meta">· ${escapeHTML(u.namespace)} · </span><span class="imp-label ${sevCls}">${escapeHTML((u.scope||'').toUpperCase())}</span><div class="meta">SA: ${escapeHTML(u.service_account||'')}</div></div><div style="display:flex;gap:6px"><button class="btn primary" data-act="kube">kubeconfig</button><button class="btn danger" data-act="del">remove</button></div>`;
+        r.querySelector('[data-act=kube]').onclick = () => showKubeconfigModal(u);
+        r.querySelector('[data-act=del]').onclick = async () => {
+          if (!confirm('Remove ' + u.name + '?')) return;
+          await api.deleteUser(u.name); toast('Removed'); lastSig=null; rerender();
         };
-        list.append(row);
+        list.append(r);
       });
     }
     m.append(list);
-    renderRail(lastSummary);
   }
 
   function showKubeconfigModal(u) {
-    const url = api.userKubeconfigURL(u.name) + '?ttl=3600';
+    const url = api.userKubeURL(u.name) + '?ttl=3600';
     const shade = el('div','modal-shade');
     const m = el('div','modal');
-    m.style.cssText='max-width:680px;width:100%';
     m.innerHTML = `
       <h3>kubeconfig for ${escapeHTML(u.name)}</h3>
-      <div class="rec-reason">A kubeconfig with a 1-hour token is generated on demand. Click to download or fetch it directly.</div>
-      <div style="background:var(--panel-2);border-radius:8px;padding:14px;margin-top:12px;font-size:13px;line-height:1.6">
-        <div><strong>Namespace:</strong> ${escapeHTML(u.namespace)}</div>
-        <div><strong>Scope:</strong> ${escapeHTML(u.scope||'')}</div>
-        <div><strong>ServiceAccount:</strong> ${escapeHTML(u.service_account||'')}</div>
-        <div><strong>Role:</strong> ${escapeHTML(u.role||'')}</div>
+      <div class="sub">A scoped 1-hour kubeconfig pointing through PodPulse's /k8s proxy. Audit log records every kubectl call.</div>
+      <div class="pcard" style="margin-top:14px">
+        <div class="row-line"><strong>Namespace</strong><span>${escapeHTML(u.namespace)}</span></div>
+        <div class="row-line"><strong>Scope</strong><span>${escapeHTML(u.scope||'')}</span></div>
+        <div class="row-line"><strong>ServiceAccount</strong><span>${escapeHTML(u.service_account||'')}</span></div>
       </div>
       <div style="margin-top:14px">
-        <strong style="font-size:12px;color:var(--muted)">QUICK USE (this kubeconfig points at PodPulse — kubectl traffic is proxied to the cluster)</strong>
-        <div class="cmd">curl -o ${escapeHTML(u.name)}.kubeconfig ${location.origin}${url}
-export KUBECONFIG=$(pwd)/${escapeHTML(u.name)}.kubeconfig
-kubectl get pods -n ${escapeHTML(u.namespace)}</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">
-          Make sure your tunnel / DNS resolves <code>${location.host}</code> from wherever kubectl runs. For the local SSH-tunnel setup, that's just <code>localhost:8080</code> — the same way you reach this dashboard.
-        </div>
+        <strong style="font-size:11px;color:var(--muted-2);text-transform:uppercase">Quick use</strong>
+        <div class="cmd">curl -o ${escapeHTML(u.name)}.kubeconfig ${location.origin}${url}\nexport KUBECONFIG=$(pwd)/${escapeHTML(u.name)}.kubeconfig\nkubectl get pods -n ${escapeHTML(u.namespace)}</div>
       </div>
       <div class="actions">
         <a class="btn primary" href="${url}" download="${escapeHTML(u.name)}.kubeconfig">Download kubeconfig</a>
         <button class="btn ghost" id="kc-close">Close</button>
       </div>
     `;
-    shade.append(m);
-    shade.onclick = e => { if (e.target === shade) shade.remove(); };
+    shade.append(m); shade.onclick = e => { if (e.target===shade) shade.remove(); };
     document.body.append(shade);
     m.querySelector('#kc-close').onclick = () => shade.remove();
   }
 
-  // -------------- Anomalies (legacy view, kept) --------------
-  async function renderAnomalies() {
-    const sum = lastSummary || await api.summary();
-    const data = await api.anomalies({limit: 200, severity: activeSeverity, since: '6h'});
-    const m = $('#main');
-    m.innerHTML = '';
+  let auditFilter = { only_humans: 'true', since: '6h' };
+  async function renderAudit() {
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Audit log'));
 
-    // Tabs
-    const tabs = el('div','tabs');
-    const allTab = el('div','tab' + (activeSeverity===''?' active':''),
-      `All anomalies <span class="num">${sum.total||0}</span>`);
-    allTab.onclick = () => { activeSeverity=''; rerender(); };
-    tabs.append(allTab);
-    [['critical','crit'],['high','high'],['medium','med'],['low','low']].forEach(([k,c]) => {
-      const t = el('div',`tab ${c}` + (activeSeverity===k?' active':''),
-        `<div class="dot"></div> ${k[0].toUpperCase()+k.slice(1)} <span class="num">${(sum.by_severity||{})[k]||0}</span>`);
-      t.onclick = () => { activeSeverity = (activeSeverity===k?'':k); rerender(); };
-      tabs.append(t);
+    const filt = el('div','pcard');
+    filt.style.display = 'flex';
+    filt.style.gap = '10px';
+    filt.style.alignItems = 'center';
+    const onlyH = el('label','',`<input type="checkbox" ${auditFilter.only_humans==='true'?'checked':''}/> Only human actors`);
+    onlyH.style.cssText='font-size:12px;color:var(--muted)';
+    onlyH.querySelector('input').onchange = e => { auditFilter.only_humans = e.target.checked?'true':''; lastSig=null; rerender(); };
+    filt.append(onlyH);
+    ['1h','6h','24h'].forEach(d => {
+      const b = el('button','btn'+(auditFilter.since===d?' primary':''),'Last '+d);
+      b.onclick = () => { auditFilter.since=d; lastSig=null; rerender(); };
+      filt.append(b);
     });
-    m.append(tabs);
+    m.append(filt);
 
-    // Filters row
-    const fr = el('div','filters-row');
-    fr.innerHTML = `
-      <div class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Last 6 hours</div>
-      <div class="pill primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18l-7 9v6l-4-2v-4z"/></svg>Filters</div>
-    `;
-    m.append(fr);
-
-    // Header row
-    const head = el('div');
-    head.style.cssText = 'display:grid;grid-template-columns:1fr 120px 220px 180px;color:var(--muted);font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:0 18px 8px;';
-    head.innerHTML = `<div>Anomaly</div><div>Severity</div><div>Impact</div><div>First seen</div>`;
-    m.append(head);
-
-    if (!data.anomalies || data.anomalies.length === 0) {
-      m.append(el('div', 'empty', '<div class="pulse-dot"></div>Watching cluster heartbeat — no anomalies yet.'));
+    const data = await api.audit(auditFilter);
+    const list = el('div','pcard');
+    list.append(el('h2','',`Mutations${auditFilter.actor?' by '+auditFilter.actor:''} (${data.count||0})`));
+    if (!data.events || !data.events.length) {
+      list.append(el('div','empty','No mutations in this window. Either nothing changed, or PodPulse needs a few seconds.'));
     } else {
-      // Collapse low-severity unless the user expanded or filtered to "low".
-      const items = data.anomalies;
-      const high = items.filter(a => a.severity !== 'low');
-      const low  = items.filter(a => a.severity === 'low');
-      const showingLow = (activeSeverity === 'low') || showLow;
-
-      if (high.length === 0 && low.length > 0 && !showingLow) {
-        m.append(el('div','empty','No high-impact anomalies — only low-severity items, hidden by default.'));
-      }
-      high.forEach(a => m.append(anomalyCard(a)));
-
-      if (!showingLow && low.length > 0) {
-        const fold = el('div','low-fold',
-          `${low.length} low-impact ${low.length === 1 ? 'anomaly' : 'anomalies'} hidden — click to expand`);
-        fold.onclick = () => { showLow = true; lastRenderSig = null; rerender(true); };
-        m.append(fold);
-      } else {
-        low.forEach(a => m.append(anomalyCard(a)));
-      }
-    }
-    renderRail(sum);
-  }
-
-  function anomalyCard(a) {
-    const card = el('div', `a-card sev-${sevColor(a.severity)}`);
-
-    // Top row: tag + urgency + workload path + severity
-    const top = el('div','a-top');
-    const tagLabel = a.deployment_correlated ? 'NEW ERROR AFTER DEPLOY'
-      : a.first_seen_in_version ? 'NEW ERROR TEMPLATE'
-      : (a.kind === 'template_rate_spike' ? 'RATE SPIKE'
-      : (a.kind === 'restart_rate' ? 'RESTART SPIKE' : 'NEW ANOMALY'));
-    const tagCls = a.deployment_correlated ? 'a-tag deploy' : 'a-tag';
-    top.append(el('span', tagCls, tagLabel));
-    if (a.urgency) {
-      const urgLbl = ({worsening:'Worsening', active:'Active', new:'New', settled:'Settled'})[a.urgency] || a.urgency;
-      top.append(el('span', `urg ${a.urgency}`, urgLbl));
-    }
-    const path = el('span','a-path', escapeHTML(wlPath(a.workload)));
-    top.append(path);
-    const sevPill = el('span','a-sev', sevPretty(a.severity));
-    top.append(sevPill);
-    card.append(top);
-
-    // Three-tier headline (human → technical → raw)
-    const tier1 = el('div','h-tier1');
-    tier1.innerHTML = escapeHTML(a.human_headline || a.headline || 'New anomaly');
-    if (a.first_seen_in_version) tier1.innerHTML += ' <span class="first-seen">First seen in this version</span>';
-    if (a.variants && a.variants.length) tier1.innerHTML += ` <span class="first-seen">+${a.variants.length} variants</span>`;
-    card.append(tier1);
-    if (a.technical_headline) {
-      card.append(el('div','h-tier2', escapeHTML(a.technical_headline)));
-    }
-    if (a.short_story) card.append(el('div','a-story', escapeHTML(a.short_story)));
-
-    // Meta grid: impact + times
-    const meta = el('div','a-meta');
-    const impact = el('div','a-impact');
-    // Impact: clear LOW/MEDIUM/HIGH/CRITICAL label first.
-    const impCls = ({low:'low', medium:'med', high:'high', critical:'crit'})[a.impact_level || 'low'] || 'low';
-    const impLabel = ({low:'LOW', medium:'MEDIUM', high:'HIGH', critical:'CRITICAL'})[a.impact_level || 'low'] || 'LOW';
-    const impLine = el('div','row');
-    const lbl = el('span', `imp-label ${impCls}`, `Impact: ${impLabel}`);
-    impLine.append(lbl);
-    if (a.impact_line) {
-      impLine.append(el('span', '', ' · ' + escapeHTML(a.impact_line.replace(/^\s*/, ''))));
-    }
-    impact.append(impLine);
-    // Blast radius dots — visual reinforcement
-    const blastWrap = el('div','row');
-    blastWrap.append(blastRadius(a.affected_pods || 1, a.severity));
-    impact.append(blastWrap);
-    if (a.time_to_detection_seconds) {
-      const r = el('div','row');
-      r.innerHTML = `<span>Detected ${humSecs(a.time_to_detection_seconds)} after rollout</span>`;
-      impact.append(r);
-    }
-    if (a.image_digest) {
-      const r = el('div','row');
-      r.innerHTML = `<span style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML(a.image_digest.slice(0,22))}…</span>`;
-      impact.append(r);
-    }
-    const times = el('div','a-times', `<div class="ago">${fmtTime(a.fired_at)}</div><div data-fired="${a.fired_at}">${fmtAgo(a.fired_at)}</div>`);
-    meta.append(impact, times);
-    card.append(meta);
-
-    // Before vs After deployment (only when we have it)
-    if (a.before_after) {
-      const ba = a.before_after;
-      const panel = el('div','ba-panel');
-      const beforeBad = ba.before > 0;
-      const afterBad = ba.after > 0;
-      const beforeCell = el('div','ba-cell');
-      beforeCell.innerHTML = `<div class="l">Before deployment</div><div class="n ${beforeBad?'bad':'ok'}">${ba.before}</div><div class="s">errors of this kind</div>`;
-      const afterCell = el('div','ba-cell');
-      afterCell.innerHTML = `<div class="l">After deployment</div><div class="n ${afterBad?'bad':'ok'}">${ba.after}${ba.after>ba.before?' ↑':''}</div><div class="s">errors of this kind</div>`;
-      const ch = el('div','ba-change');
-      let chTxt;
-      if (ba.change_pct < 0) chTxt = '<div class="v inf">+∞%</div>';
-      else if (ba.before === 0 && ba.after === 0) chTxt = '<div class="v" style="color:var(--ok)">no change</div>';
-      else chTxt = `<div class="v">${ba.change_pct >= 0 ? '+' : ''}${ba.change_pct}%</div>`;
-      ch.innerHTML = chTxt + `<div class="l">change</div>`;
-      panel.append(beforeCell, afterCell, ch);
-      card.append(panel);
-    }
-
-    // What happened narrative
-    if (a.what_happened) {
-      const nar = el('div','narrative');
-      nar.innerHTML = `<h4>What happened</h4>${escapeHTML(a.what_happened)}` +
-        (a.likely_cause ? `<div class="cause"><strong>Likely cause:</strong> ${escapeHTML(a.likely_cause)}</div>` : '');
-      card.append(nar);
-    }
-
-    // Timeline
-    if (a.timeline && a.timeline.length) {
-      const tl = el('div','a-timeline');
-      a.timeline.forEach((step, i) => {
-        if (i > 0) tl.append(el('span','arrow','→'));
-        const s = el('span','step');
-        s.innerHTML = `<strong>${fmtTime(step.when)}</strong> ${escapeHTML(step.label)}`;
-        tl.append(s);
-      });
-      card.append(tl);
-    }
-
-    // Confidence bar with explainable factors
-    if (a.confidence) {
-      const conf = el('div','a-confidence');
-      const tip = (a.confidence_factors||[]).join('\n• ');
-      conf.innerHTML = `<span>Confidence <span class="conf-help" title="Confidence is computed from deployment timing, novelty of the error pattern, blast radius, and rate change.${tip ? '\n• '+tip : ''}">?</span></span><div class="bar"><div style="width:${a.confidence}%"></div></div><strong>${a.confidence}%</strong>`;
-      card.append(conf);
-      if (a.confidence_factors && a.confidence_factors.length) {
-        const ex = el('div','conf-explain');
-        ex.innerHTML = `Based on:<ul>${a.confidence_factors.map(f => `<li>${escapeHTML(f)}</li>`).join('')}</ul>`;
-        card.append(ex);
-      }
-    }
-
-    // Chips
-    const chips = el('div','a-chips');
-    chips.innerHTML = `
-      <span class="a-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg><code>id: ${escapeHTML(a.id.slice(0,16))}…</code></span>
-    `;
-    if (a.variants && a.variants.length) {
-      const v = el('span','a-chip variants', `+${a.variants.length} similar variants`);
-      chips.append(v);
-    }
-    card.append(chips);
-
-    // Actions
-    const acts = el('div','a-actions');
-    const view = el('button','btn primary','Investigate');
-    view.onclick = () => showDetails(a.id);
-    acts.append(view);
-    if (a.deployment_correlated) {
-      const rb = el('button','btn','Rollback');
-      rb.onclick = () => showRollbackModal(a);
-      acts.append(rb);
-    }
-    const silence = el('button','btn','Silence');
-    silence.onclick = () => doAction(a.id, 'silence');
-    const resolve = el('button','btn','Mark resolved');
-    resolve.onclick = () => doAction(a.id, 'resolve');
-    const ignore = el('button','btn ghost','Ignore');
-    ignore.onclick = () => doAction(a.id, 'ignore');
-    acts.append(silence, resolve, ignore);
-    card.append(acts);
-
-    // Next steps — numbered thinking guide instead of command dump
-    if (a.suggestions && a.suggestions.length) {
-      const steps = el('div','steps');
-      steps.append(el('h4','','Next steps'));
-      a.suggestions.slice(0, 3).forEach((s, i) => {
-        const row = el('div','step');
-        row.append(el('div','step-num', String(i + 1)));
-        const body = el('div','step-body');
-        body.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>${s.command?'<code>'+escapeHTML(s.command)+'</code>':''}${s.why?'<div class="why">'+escapeHTML(s.why)+'</div>':''}`;
-        row.append(body);
-        steps.append(row);
-      });
-      if (a.suggestions.length > 3) {
-        steps.append(el('div','why', `+${a.suggestions.length-3} more in details`));
-      }
-      card.append(steps);
-    }
-
-    return card;
-  }
-
-  async function doAction(id, action) {
-    try {
-      await api.setState(id, action);
-      toast(`${action[0].toUpperCase()+action.slice(1)}d`);
-      tick();
-    } catch (e) {
-      toast('Failed: ' + e.message);
-    }
-  }
-
-  async function showDetails(id) {
-    try {
-      const a = await api.anomaly(id);
-      const overlay = el('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:grid;place-items:center;padding:30px;';
-      const card = anomalyCard(a);
-      card.style.cssText = 'max-width:760px;width:100%;max-height:80vh;overflow-y:auto;';
-      // Show ALL suggestions in the modal.
-      const sug = card.querySelector('.a-suggestions');
-      if (sug && a.suggestions && a.suggestions.length > 2) {
-        sug.innerHTML = '<h4>Suggested investigation</h4>';
-        a.suggestions.forEach(s => {
-          const box = el('div','a-sug');
-          box.innerHTML = `<div class="t">${escapeHTML(s.title)}</div>${s.command?'<code>'+escapeHTML(s.command)+'</code>':''}${s.why?'<div class="why">'+escapeHTML(s.why)+'</div>':''}`;
-          sug.append(box);
-        });
-      }
-      // Add raw template + sample
-      const detail = el('div', 'a-suggestions');
-      detail.innerHTML = `<h4>Raw template</h4><div class="a-sug"><code>${escapeHTML(a.template||'')}</code></div>`;
-      if (a.sample && a.sample.length) {
-        detail.innerHTML += `<h4 style="margin-top:10px;">Sample line (redacted)</h4><div class="a-sug"><code>${escapeHTML(a.sample[0])}</code></div>`;
-      }
-      card.append(detail);
-      overlay.append(card);
-      overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-      document.body.append(overlay);
-    } catch(e) { toast('Failed: ' + e.message); }
-  }
-
-  // -------------- Workloads --------------
-  async function renderWorkloads() {
-    const m = $('#main');
-    const data = await api.workloads();
-    m.innerHTML = '';
-    const card = el('div','pcard');
-    card.append(el('h3','',`Workloads <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
-    const t = document.createElement('table');
-    t.innerHTML = `<thead><tr><th>Namespace</th><th>Kind</th><th>Name</th><th>Pods</th><th>Anomalies</th><th>Worst</th><th>Image</th><th>Last rollout</th></tr></thead><tbody></tbody>`;
-    const body = t.querySelector('tbody');
-    (data.workloads||[]).forEach(w => {
-      const tr = document.createElement('tr');
-      const sev = w.worst_severity || '';
-      tr.innerHTML = `
-        <td>${escapeHTML(w.workload.namespace)}</td>
-        <td style="color:var(--muted)">${escapeHTML(w.workload.kind||'')}</td>
-        <td><strong>${escapeHTML(w.workload.name)}</strong></td>
-        <td>${w.pods}</td>
-        <td>${w.anomaly_count}</td>
-        <td>${sev?`<span class="sevdot ${sev}"></span>${sev}`:'<span style="color:var(--muted)">—</span>'}</td>
-        <td style="color:var(--muted);font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML((w.image||'').slice(0,40))}${(w.image||'').length>40?'…':''}</td>
-        <td style="color:var(--muted)">${w.last_rollout ? fmtAgo(w.last_rollout) : '—'}</td>
-      `;
-      body.append(tr);
-    });
-    card.append(t);
-    m.append(card);
-    renderRail(lastSummary);
-  }
-
-  // -------------- Incidents --------------
-  async function renderIncidents() {
-    const m = $('#main');
-    const data = await api.incidents();
-    m.innerHTML = '';
-    if (!data.incidents || !data.incidents.length) {
-      m.append(el('div', 'empty', 'No grouped incidents in the current window.'));
-    } else {
-      data.incidents.forEach(i => {
-        const c = el('div','pcard');
-        c.innerHTML = `
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-            <span class="sevdot ${i.worst_severity||'medium'}"></span>
-            <strong>${escapeHTML(i.namespace)}</strong>
-            <span style="color:var(--muted);font-size:12px;">started ${fmtAgo(i.started_at)} · ${i.anomaly_count} anomalies across ${i.workloads.length} workloads</span>
-          </div>
-          <div style="color:var(--muted);font-size:12px;margin-bottom:6px;">${escapeHTML(i.workloads.join(', '))}</div>
-          ${(i.headlines||[]).map(h => `<div class="row"><div class="name">${escapeHTML(h)}</div></div>`).join('')}
-        `;
-        m.append(c);
+      const head = el('div','audit-row');
+      head.style.cssText = 'color:var(--muted-2);text-transform:uppercase;font-size:10.5px;letter-spacing:.05em';
+      head.innerHTML = `<div>Time</div><div>Actor</div><div>Action</div><div>Object</div><div>Risk</div>`;
+      list.append(head);
+      data.events.forEach(e => {
+        const r = el('div','audit-row');
+        const fields = (e.fields||[]).join(', ');
+        const riskCls = ({high:'high',medium:'med',info:'low'})[e.risk] || 'low';
+        r.innerHTML = `<div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(e.when)}</div><div><strong>${escapeHTML(e.actor)}</strong></div><div style="color:var(--muted-2);text-transform:uppercase;font-size:11px">${escapeHTML(e.action||'')}</div><div><strong>${escapeHTML(e.kind)}/${escapeHTML(e.name)}</strong> <span class="meta">${e.namespace?'in '+escapeHTML(e.namespace):''}</span>${fields?`<div class="meta">touched: ${escapeHTML(fields)}</div>`:''}</div><div><span class="imp-label ${riskCls}">${(e.risk||'').toUpperCase()}</span></div>`;
+        list.append(r);
       });
     }
-    renderRail(lastSummary);
+    m.append(list);
   }
 
-  // -------------- Deployments --------------
-  async function renderDeployments() {
-    const m = $('#main');
-    const data = await api.deployments();
-    m.innerHTML = '';
-    const card = el('div','pcard');
-    card.append(el('h3','',`Recent deployments <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
-    if (!data.deployments || !data.deployments.length) {
-      card.append(el('div','empty','No rollouts in the last 7 days.'));
-    } else {
-      data.deployments.forEach(d => {
-        const row = el('div','row');
-        const status = d.issue_detected
-          ? `<span style="color:var(--high)">Caused ${d.caused_anomalies} anomalies</span>`
-          : `<span style="color:var(--ok)">No issues</span>`;
-        row.innerHTML = `
-          <div>
-            <div class="name"><strong>${escapeHTML(d.workload.name)}</strong> <span style="color:var(--muted);font-size:11.5px;">${escapeHTML(d.workload.namespace)}</span></div>
-            <div class="meta">${fmtTime(d.when)} · ${escapeHTML((d.image||'').slice(0,60))}${d.commit?` · commit ${escapeHTML(d.commit.slice(0,7))}`:''}</div>
-          </div>
-          <div>${status}</div>
-        `;
-        card.append(row);
-      });
-    }
-    m.append(card);
-    renderRail(lastSummary);
-  }
-
-  // -------------- Services --------------
-  async function renderServices() {
-    const m = $('#main');
-    const data = await api.services();
-    m.innerHTML = '';
-    const card = el('div','pcard');
-    card.append(el('h3','',`Services <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
-    const t = document.createElement('table');
-    t.innerHTML = `<thead><tr><th>Namespace</th><th>Name</th><th>Type</th><th>ClusterIP</th><th>Ports</th></tr></thead><tbody></tbody>`;
-    const tb = t.querySelector('tbody');
-    (data.services||[]).forEach(s => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHTML(s.Namespace)}</td><td>${escapeHTML(s.Name)}</td><td style="color:var(--muted)">${escapeHTML(s.Type||'')}</td><td style="font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML(s.ClusterIP||'')}</td><td style="color:var(--muted);font-family:ui-monospace,monospace;font-size:11.5px">${escapeHTML((s.Ports||[]).join(', '))}</td>`;
-      tb.append(tr);
-    });
-    card.append(t);
-    m.append(card);
-    renderRail(lastSummary);
-  }
-
-  // -------------- Events --------------
-  async function renderEvents() {
-    const m = $('#main');
-    const data = await api.events();
-    m.innerHTML = '';
-    const card = el('div','pcard');
-    card.append(el('h3','',`Events <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
-    (data.events||[]).slice(0,200).forEach(e => {
-      const r = el('div','row');
-      r.innerHTML = `<div><div class="name">${escapeHTML(e.subject)}</div><div class="meta">${escapeHTML(e.message||'')}</div></div><div class="meta">${fmtTime(e.time)}</div>`;
-      card.append(r);
-    });
-    m.append(card);
-    renderRail(lastSummary);
-  }
-
-  // -------------- Silences --------------
-  async function renderSilences() {
-    const m = $('#main');
-    const data = await api.anomalies({state: 'silenced', limit: 200});
-    m.innerHTML = '';
-    const card = el('div','pcard');
-    card.append(el('h3','',`Silenced anomalies <span style="color:var(--muted);font-weight:400">(${data.count||0})</span>`));
-    if (!data.anomalies || !data.anomalies.length) {
-      card.append(el('div','empty','No silenced anomalies. Use "Silence" on any active card to mute it.'));
-    } else {
-      data.anomalies.forEach(a => {
-        const r = el('div','row');
-        r.innerHTML = `<div><div class="name">${escapeHTML(a.headline||a.template||'(no title)')}</div><div class="meta">${escapeHTML(wlPath(a.workload))}</div></div><div class="meta">silenced ${fmtAgo(a.updated_at)}</div>`;
-        card.append(r);
-      });
-    }
-    m.append(card);
-    renderRail(lastSummary);
-  }
-
-  // -------------- Channels --------------
   async function renderChannels() {
-    const m = $('#main');
     const data = await api.channels();
-    m.innerHTML = '';
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Channels'));
     const card = el('div','pcard');
-    card.append(el('h3','',`Alert channels`));
+    card.append(el('h2','','Alert channels'));
     const all = ['slack','teams','smtp','pagerduty','webhook'];
-    const configured = new Set((data.channels||[]).map(c => c.name));
+    const cfg = new Set((data.channels||[]).map(c => c.name));
     all.forEach(name => {
-      const r = el('div','row');
-      const status = configured.has(name)
-        ? `<span style="color:var(--ok)">Configured</span>`
-        : `<span style="color:var(--muted)">Not configured (set --${name}-webhook or env)</span>`;
-      r.innerHTML = `<div class="name">${name[0].toUpperCase()+name.slice(1)}</div>${status}`;
+      const r = el('div','row-line');
+      r.innerHTML = `<div><strong>${escapeHTML(name[0].toUpperCase()+name.slice(1))}</strong></div><div>${cfg.has(name)?'<span style="color:var(--low)">Configured</span>':'<span class="meta">Not configured</span>'}</div>`;
       card.append(r);
     });
     m.append(card);
-    renderRail(lastSummary);
   }
 
-  // -------------- Settings --------------
   async function renderSettings() {
-    const m = $('#main');
     const sum = lastSummary || await api.summary();
-    m.innerHTML = '';
+    const m = $('#main'); m.innerHTML = '';
+    m.append(pageHead('Settings'));
     const card = el('div','pcard');
-    card.append(el('h3','','Detector settings'));
+    card.append(el('h2','','Detector status'));
     card.innerHTML += `
-      <div class="row"><div class="name">K8s integration</div><div class="meta">${sum.k8s_connected?'Connected (informers active)':'Not connected'}</div></div>
-      <div class="row"><div class="name">Storage policy</div><div class="meta">${escapeHTML(sum.storage_policy||'')}</div></div>
-      <div class="row"><div class="name">Detector started</div><div class="meta">${sum.started_at ? new Date(sum.started_at).toLocaleString() : '—'}</div></div>
-      <div class="row"><div class="name">Configured channels</div><div class="meta">${(sum.channels||[]).join(', ') || 'none'}</div></div>
+      <div class="row-line"><strong>K8s integration</strong><span>${sum.k8s_connected?'<span style="color:var(--low)">Connected</span>':'<span style="color:var(--high)">Not connected</span>'}</span></div>
+      <div class="row-line"><strong>Storage</strong><span>${escapeHTML(sum.storage_policy||'')}</span></div>
+      <div class="row-line"><strong>Started</strong><span class="meta">${sum.started_at?new Date(sum.started_at).toLocaleString():'—'}</span></div>
+      <div class="row-line"><strong>Channels</strong><span class="meta">${(sum.channels||[]).join(', ') || 'none'}</span></div>
     `;
     m.append(card);
-    renderRail(sum);
   }
 
-  // -------------- Right rail --------------
-  function renderRail(sum) {
-    if (!sum) return;
-    const rail = $('#rail');
-    rail.innerHTML = '';
-
-    // Incident summary
-    const inc = el('div','card');
-    inc.innerHTML = `<h3>Incident summary</h3><div class="sub">Since last 6 hours</div>`;
-    const totLine = el('div','total-line');
-    totLine.innerHTML = `<div class="big">${sum.total||0}</div><div class="lbl">total anomalies</div>`;
-    inc.append(totLine);
-    inc.append(sparkline(sum.sparkline));
-    inc.append(sevBar(sum.by_severity));
-    rail.append(inc);
-
-    // Top workloads
-    const tw = el('div','card');
-    tw.innerHTML = `<h3>Top workloads</h3><div class="sub">By affected pods</div>`;
-    if (!sum.top_workloads || !sum.top_workloads.length) {
-      tw.append(el('div','sub','No anomalies in window'));
-    } else {
-      sum.top_workloads.forEach(w => {
-        const r = el('div','row');
-        const max = Math.max(1, ...sum.top_workloads.map(x => x.affected_pods || x.anomaly_count || 1));
-        const pct = Math.max(8, Math.round(100 * (w.affected_pods || w.anomaly_count) / max));
-        r.innerHTML = `<div style="flex:1;min-width:0;"><div class="name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(w.workload.name)}</div><div style="height:4px;background:var(--panel-2);border-radius:2px;margin-top:6px;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px;"></div></div></div><div class="num">${w.affected_pods || w.anomaly_count}</div>`;
-        tw.append(r);
+  // -------------- shared header builder --------------
+  function pageHead(title, actions) {
+    const h = el('div','page-head');
+    const t = el('h1','', escapeHTML(title));
+    h.append(t);
+    if (actions && actions.length) {
+      const a = el('div','actions');
+      actions.forEach(([label, href, primary]) => {
+        const link = el('a',`btn${primary?' primary':''}`, escapeHTML(label));
+        link.href = href; link.target = '_blank';
+        a.append(link);
       });
+      h.append(a);
     }
-    rail.append(tw);
-
-    // Recent deployments
-    const rd = el('div','card');
-    rd.innerHTML = `<h3>Recent deployments</h3><div class="sub">Last 24 hours</div>`;
-    if (!sum.recent_deployments || !sum.recent_deployments.length) {
-      rd.append(el('div','sub','No rollouts'));
-    } else {
-      sum.recent_deployments.forEach(d => {
-        const r = el('div','row');
-        const tag = d.issue_detected
-          ? `<span style="color:var(--high);font-size:11px;background:rgba(255,138,61,.12);padding:2px 7px;border-radius:4px;">Caused issues</span>`
-          : `<span style="color:var(--ok);font-size:11px;background:rgba(105,209,153,.10);padding:2px 7px;border-radius:4px;">✓ No issues</span>`;
-        r.innerHTML = `<div style="flex:1;min-width:0;"><div class="name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(d.workload.name)}</div><div class="meta">${fmtTime(d.when)}${d.commit?` · ${escapeHTML(d.commit.slice(0,7))}`:''}</div></div>${tag}`;
-        rd.append(r);
-      });
-    }
-    rail.append(rd);
-
-    // Recommendations
-    if (sum.recommendations && sum.recommendations.length) {
-      const r = el('div','card');
-      r.innerHTML = `<h3>Recommended actions</h3>`;
-      sum.recommendations.forEach((t, i) => r.append(el('div','row',`<div class="name">${i+1}. ${escapeHTML(t)}</div>`)));
-      rail.append(r);
-    }
-  }
-
-  function sevBar(by) {
-    by = by || {};
-    const wrap = el('div','sev-bar');
-    wrap.innerHTML = `
-      <div class="sev-cell crit"><div class="n">${by.critical||0}</div><div class="l">Critical</div></div>
-      <div class="sev-cell high"><div class="n">${by.high||0}</div><div class="l">High</div></div>
-      <div class="sev-cell med"><div class="n">${by.medium||0}</div><div class="l">Medium</div></div>
-      <div class="sev-cell low"><div class="n">${by.low||0}</div><div class="l">Low</div></div>
-    `;
-    return wrap;
-  }
-
-  function sparkline(points) {
-    points = points || [];
-    if (!points.length) return el('div');
-    const max = Math.max(1, ...points.map(p => p.count));
-    const w = 280, h = 50;
-    const stepX = w / (points.length - 1 || 1);
-    const path = points.map((p, i) => {
-      const x = i * stepX;
-      const y = h - (p.count / max) * h;
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-    const area = path + ` L${w},${h} L0,${h} Z`;
-    const svg = el('div');
-    svg.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="50" style="margin-top:10px;display:block;"><defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d6d" stop-opacity=".4"/><stop offset="1" stop-color="#ff4d6d" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#sg)" /><path d="${path}" stroke="#ff4d6d" stroke-width="1.5" fill="none"/></svg>`;
-    return svg;
-  }
-
-  // -------------- toast --------------
-  function toast(msg) {
-    const t = el('div','toast', escapeHTML(msg));
-    document.body.append(t);
-    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 2200);
+    return h;
   }
 </script>
 

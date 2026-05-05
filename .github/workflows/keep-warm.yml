@@ -1,0 +1,38 @@
+# Keeps the Render free-tier demo from sleeping.
+#
+# Render's free Docker plan suspends the container after 15 min of
+# inactivity; first visitor after a sleep waits ~30 s for cold start.
+# This workflow pings /healthz every 10 minutes so the container
+# stays warm for human visitors.
+#
+# Cost: zero (well within GitHub Actions' free 2000-min/month).
+# Each run takes ~5 seconds, ~6 runs/hour = ~720 min/month.
+
+name: Keep demo warm
+
+on:
+  schedule:
+    # Every 10 minutes. Cron uses UTC.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Wake the Render demo
+        run: |
+          set -eu
+          URL="${PODPULSE_DEMO_URL:-https://podpulse-demo.onrender.com/healthz}"
+          # First call may take ~30 s if container was sleeping; --max-time 60.
+          # We don't fail the workflow on a single bad ping — Render can be
+          # flaky and we just want best-effort warmth.
+          code=$(curl -sk --max-time 60 -o /dev/null -w "%{http_code}" "$URL" || echo 000)
+          echo "ping returned HTTP $code"
+          if [ "$code" = "000" ]; then
+            echo "::warning ::ping failed — Render likely slow to wake; will retry next tick"
+            exit 0
+          fi
+        env:
+          PODPULSE_DEMO_URL: https://podpulse-demo.onrender.com/healthz

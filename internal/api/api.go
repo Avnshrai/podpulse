@@ -32,6 +32,8 @@ import (
 	"github.com/podpulse/podpulse/internal/alert"
 	"github.com/podpulse/podpulse/internal/anomaly"
 	"github.com/podpulse/podpulse/internal/detect/templates"
+	"github.com/google/uuid"
+	"github.com/podpulse/podpulse/internal/clusters"
 	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
 	"github.com/podpulse/podpulse/internal/rca"
@@ -55,6 +57,7 @@ type Server struct {
 	eventWatcher  *ppk8s.EventWatcher
 	auditWatcher  *ppk8s.AuditWatcher
 	userManager   *users.Manager
+	clusterStore  *clusters.Store
 	issueEngine   *issue.Engine
 	channels      []string
 	startedAt     time.Time
@@ -70,6 +73,7 @@ type Options struct {
 	EventWatcher  *ppk8s.EventWatcher
 	AuditWatcher  *ppk8s.AuditWatcher
 	UserManager   *users.Manager
+	ClusterStore  *clusters.Store
 	IssueEngine   *issue.Engine
 	Channels      []string
 }
@@ -85,6 +89,7 @@ func NewServer(opts Options) *Server {
 		eventWatcher:  opts.EventWatcher,
 		auditWatcher:  opts.AuditWatcher,
 		userManager:   opts.UserManager,
+		clusterStore:  opts.ClusterStore,
 		issueEngine:   opts.IssueEngine,
 		channels:      opts.Channels,
 		startedAt:     time.Now(),
@@ -126,6 +131,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/users", s.handleCreateUser)
 	mux.HandleFunc("DELETE /v1/users/{name}", s.handleDeleteUser)
 	mux.HandleFunc("GET /v1/users/{name}/kubeconfig", s.handleUserKubeconfig)
+
+	// Bring-your-own-kubeconfig clusters (multi-cluster scaffold).
+	mux.HandleFunc("GET /v1/clusters", s.handleListClusters)
+	mux.HandleFunc("POST /v1/clusters", s.handleRegisterCluster)
+	mux.HandleFunc("DELETE /v1/clusters/{id}", s.handleDeleteCluster)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1092,6 +1102,62 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := s.userManager.Remove(r.Context(), name); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Clusters (BYO kubeconfig) ---
+
+func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {
+	if s.clusterStore == nil {
+		writeJSON(w, map[string]any{"clusters": []any{}, "count": 0, "available": false})
+		return
+	}
+	list, err := s.clusterStore.List(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"clusters": list, "count": len(list), "available": true})
+}
+
+type registerClusterReq struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Kubeconfig  string `json:"kubeconfig"`
+}
+
+func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
+	if s.clusterStore == nil {
+		http.Error(w, "cluster registry not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	var body registerClusterReq
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+		http.Error(w, "bad body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	c, err := s.clusterStore.Register(r.Context(), body.Name, body.Kubeconfig, body.Description, "ui")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, c)
+}
+
+func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
+	if s.clusterStore == nil {
+		http.Error(w, "cluster registry not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	if err := s.clusterStore.Delete(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

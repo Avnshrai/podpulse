@@ -25,6 +25,8 @@ import (
 	"github.com/podpulse/podpulse/internal/api"
 	"github.com/podpulse/podpulse/internal/api/web"
 	"github.com/podpulse/podpulse/internal/detect/templates"
+	"github.com/podpulse/podpulse/internal/clusters"
+	"github.com/podpulse/podpulse/internal/db"
 	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
 	"github.com/podpulse/podpulse/internal/proxy"
@@ -57,6 +59,8 @@ func main() {
 			"Generate kubeconfigs with insecure-skip-tls-verify (for tunnel/localhost use). Set false in prod with a real TLS cert.")
 		tlsEnabled = flag.Bool("tls", true,
 			"Serve TLS with an in-memory self-signed cert. Required: kubectl strips bearer tokens on plain HTTP.")
+		postgresDSN = flag.String("postgres-dsn", os.Getenv("POSTGRES_DSN"),
+			"Optional Postgres DSN for persistent state (clusters, onboarded users, proxy audit). When empty, runs in-memory.")
 	)
 	flag.Parse()
 
@@ -153,6 +157,33 @@ func main() {
 	issueEngine := issue.NewEngine(configWatcher, eventWatcher, k8sCache, store)
 	go runIssueRefresher(ctx, issueEngine)
 
+	// Optional Postgres: when DSN is set we persist clusters / users /
+	// audit. When empty we run in-memory (state lost on restart).
+	var dbConn *db.DB
+	if *postgresDSN != "" {
+		conn, err := db.Open(ctx, *postgresDSN)
+		if err != nil {
+			slog.Warn("Postgres unavailable — falling back to in-memory state",
+				"err", err)
+		} else {
+			if err := conn.Migrate(ctx); err != nil {
+				slog.Warn("Postgres migrations failed — falling back to in-memory state",
+					"err", err)
+				conn.Close()
+			} else {
+				dbConn = conn
+				slog.Info("Postgres connected and migrated")
+			}
+		}
+	}
+
+	clusterStore := clusters.New(dbConn)
+	if dbConn != nil {
+		if err := clusterStore.LoadAll(ctx); err != nil {
+			slog.Warn("could not preload clusters from DB", "err", err)
+		}
+	}
+
 	server := api.NewServer(api.Options{
 		Store:         store,
 		Detector:      detector,
@@ -163,6 +194,7 @@ func main() {
 		EventWatcher:  eventWatcher,
 		AuditWatcher:  auditWatcher,
 		UserManager:   userMgr,
+		ClusterStore:  clusterStore,
 		IssueEngine:   issueEngine,
 		Channels:      channels,
 	})
