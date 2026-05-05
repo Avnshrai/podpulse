@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PodPulse — Kubernetes incident root-cause engine</title>
+<meta name="description" content="Open-source Kubernetes incident detection that fuses log anomalies, ConfigMap/Secret diffs, and K8s events into actionable issues. No instrumentation required.">
+<meta property="og:title" content="PodPulse">
+<meta property="og:description" content="Kubernetes incident root-cause engine — open-source, zero instrumentation, runs in your cluster.">
+<meta property="og:type" content="website">
+<style>
+  :root {
+    --bg:       #0a0a0b;
+    --panel:    #111114;
+    --panel-2:  #17171a;
+    --border:   #1f1f23;
+    --border-2: #2a2a30;
+    --text:     #ededee;
+    --muted:    #8a8a93;
+    --muted-2:  #5a5a63;
+    --accent:   #5b9dff;
+    --low:      #4ade80;
+    --medium:   #facc15;
+    --high:     #fb923c;
+    --critical: #f87171;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Top nav */
+  nav {
+    position: sticky; top: 0; z-index: 5;
+    background: rgba(10,10,11,.85); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .row { display: flex; align-items: center; gap: 18px; padding: 14px 0; }
+  nav .brand { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  nav .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(91,157,255,.55); }
+    50%      { box-shadow: 0 0 0 8px rgba(91,157,255,0); }
+  }
+  nav .links { margin-left: auto; display: flex; gap: 22px; align-items: center; font-size: 13px; }
+  nav .links a { color: var(--muted); }
+  nav .links a:hover { color: var(--text); text-decoration: none; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--text); color: var(--bg);
+    padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+  }
+  .btn-primary:hover { background: #fff; text-decoration: none; }
+
+  /* Hero */
+  .hero { padding: 90px 0 80px; }
+  .hero h1 {
+    font-size: 56px; line-height: 1.05; letter-spacing: -0.025em;
+    margin: 0 0 22px; max-width: 760px; font-weight: 600;
+  }
+  .hero h1 em { font-style: normal; color: var(--muted); font-weight: 400; }
+  .hero .lede {
+    font-size: 19px; line-height: 1.5; color: var(--muted);
+    max-width: 620px; margin: 0 0 28px;
+  }
+  .hero .cta { display: flex; gap: 10px; align-items: center; }
+  .btn-secondary {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border-2); color: var(--text);
+    padding: 7px 14px; border-radius: 6px; font-size: 13px;
+  }
+  .btn-secondary:hover { border-color: var(--muted-2); text-decoration: none; }
+
+  /* Animated dashboard preview */
+  .preview {
+    margin: 60px auto 80px; max-width: 1000px;
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    background: var(--panel);
+    box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(91,157,255,.04);
+  }
+  .preview-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 9px 14px; background: var(--panel-2); border-bottom: 1px solid var(--border);
+    font-size: 11px; color: var(--muted-2); font-family: ui-monospace, monospace;
+  }
+  .preview-bar .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-2); }
+  .preview-bar .dot:first-child { background: #ff5f56; }
+  .preview-bar .dot:nth-child(2) { background: #ffbd2e; }
+  .preview-bar .dot:nth-child(3) { background: #27c93f; }
+  .preview-bar .url { margin-left: 12px; }
+
+  .preview-body {
+    display: grid; grid-template-columns: 180px 1fr;
+    background: var(--bg);
+    min-height: 480px;
+  }
+  .pv-side {
+    border-right: 1px solid var(--border);
+    padding: 14px 10px;
+    background: var(--panel);
+    font-size: 12px;
+  }
+  .pv-side .item { padding: 6px 8px; color: var(--muted); border-radius: 4px; margin-bottom: 1px; }
+  .pv-side .item.active { background: var(--panel-2); color: var(--text); }
+  .pv-main { padding: 16px 18px; overflow: hidden; }
+  .pv-tabs { display: flex; gap: 18px; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .pv-tab { color: var(--muted); padding-bottom: 7px; margin-bottom: -10px; border-bottom: 1px solid transparent; }
+  .pv-tab.active { color: var(--text); border-color: var(--text); }
+
+  /* Animated cards */
+  .pv-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: var(--panel);
+    opacity: 0;
+    animation: cardIn 0.5s ease forwards;
+  }
+  .pv-card:nth-child(1) { animation-delay: 0.4s; border-left: 2px solid var(--high); }
+  .pv-card:nth-child(2) { animation-delay: 1.2s; border-left: 2px solid var(--medium); }
+  .pv-card:nth-child(3) { animation-delay: 2.0s; border-left: 2px solid var(--low); }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .pv-card .ctop {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 10.5px; color: var(--muted-2);
+    letter-spacing: .04em; text-transform: uppercase; font-weight: 500;
+  }
+  .pv-card .ctop .urg-h { color: var(--high); }
+  .pv-card .ctop .urg-m { color: var(--medium); }
+  .pv-card .ctop .urg-l { color: var(--low); }
+  .pv-card .cpath { margin-left: auto; font-family: ui-monospace, monospace; color: var(--muted-2); font-size: 11px; }
+  .pv-card .csev { color: var(--high); }
+  .pv-card.med .csev { color: var(--medium); }
+  .pv-card.low .csev { color: var(--low); }
+  .pv-card h4 { font-size: 14px; font-weight: 600; margin: 4px 0 2px; letter-spacing: -0.01em; }
+  .pv-card .csub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .pv-card .cmeta {
+    display: flex; gap: 14px; color: var(--muted-2); font-size: 11.5px;
+    padding-top: 8px; border-top: 1px solid var(--border);
+  }
+  .pv-card .cmeta strong { color: var(--text); font-weight: 500; }
+  .pv-card .conf { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .pv-card .conf .bar { flex: 1; height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; }
+  .pv-card .conf .bar > div {
+    height: 100%; background: var(--accent); width: 0;
+    animation: confFill 1.2s ease forwards;
+  }
+  .pv-card:nth-child(1) .conf .bar > div { animation-delay: 0.9s; --w: 92%; }
+  .pv-card:nth-child(2) .conf .bar > div { animation-delay: 1.7s; --w: 78%; }
+  .pv-card:nth-child(3) .conf .bar > div { animation-delay: 2.5s; --w: 64%; }
+  @keyframes confFill { to { width: var(--w); } }
+
+  /* Sections */
+  section { padding: 80px 0; }
+  section h2 {
+    font-size: 36px; letter-spacing: -0.02em; margin: 0 0 12px; font-weight: 600;
+  }
+  section .lede { color: var(--muted); font-size: 16px; max-width: 600px; margin: 0 0 40px; }
+
+  .features {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .feature {
+    background: var(--panel); padding: 24px 22px;
+  }
+  .feature h3 {
+    font-size: 14px; font-weight: 600; margin: 0 0 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .feature h3 .indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .feature p { color: var(--muted); font-size: 13px; line-height: 1.55; margin: 0; }
+
+  /* How it works diagram */
+  .arch {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+  }
+  .arch pre {
+    font-size: 12px; color: var(--muted); line-height: 1.6;
+    margin: 0; text-align: left; white-space: pre;
+    overflow-x: auto;
+  }
+
+  /* Compare table */
+  .compare {
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    background: var(--panel);
+  }
+  .compare table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .compare th, .compare td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .compare th { background: var(--panel-2); font-weight: 500; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .compare td { color: var(--muted); }
+  .compare tr:last-child td { border-bottom: 0; }
+  .compare td.you { color: var(--text); font-weight: 500; background: rgba(91,157,255,.04); }
+  .compare .yes { color: var(--low); }
+  .compare .no { color: var(--muted-2); }
+
+  /* Install snippet */
+  .install {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 28px;
+  }
+  .install pre {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px 18px; margin: 14px 0 0; overflow-x: auto;
+    font-size: 13px; color: var(--text);
+  }
+  .install pre .cmt { color: var(--muted-2); }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border); padding: 30px 0;
+    color: var(--muted-2); font-size: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  @media (max-width: 720px) {
+    .hero h1 { font-size: 38px; }
+    .features { grid-template-columns: 1fr; }
+    .preview-body { grid-template-columns: 1fr; }
+    .pv-side { display: none; }
+    section h2 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap row">
+    <div class="brand"><span class="dot"></span> PodPulse</div>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#compare">Compare</a>
+      <a href="https://github.com/podpulse/podpulse" target="_blank">GitHub</a>
+      <a class="btn-primary" href="REPLACE_DEMO_URL" target="_blank">Live demo →</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Kubernetes incident root-cause engine. <em>Not another log dashboard.</em></h1>
+    <p class="lede">PodPulse fuses log anomalies, ConfigMap/Secret diffs, and K8s events into one ranked feed of issues — with the timeline, the likely cause, and the kubectl command to fix it. Open-source, zero instrumentation, one Helm command to install.</p>
+    <div class="cta">
+      <a class="btn-primary" href="REPLACE_DEMO_URL" target="_blank">Try the live demo</a>
+      <a class="btn-secondary" href="https://github.com/podpulse/podpulse" target="_blank">GitHub →</a>
+    </div>
+
+    <!-- Animated dashboard preview -->
+    <div class="preview">
+      <div class="preview-bar">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <div class="url">podpulse.your-cluster.local</div>
+      </div>
+      <div class="preview-body">
+        <aside class="pv-side">
+          <div class="item">Overview</div>
+          <div class="item active">Issues</div>
+          <div class="item">What changed</div>
+          <div class="item">Workloads</div>
+          <div class="item">Deployments</div>
+          <div class="item">Audit log</div>
+          <div class="item">Users</div>
+        </aside>
+        <main class="pv-main">
+          <div class="pv-tabs">
+            <span class="pv-tab active">All issues <span style="color:var(--muted-2)">3</span></span>
+            <span class="pv-tab">Critical <span style="color:var(--muted-2)">0</span></span>
+            <span class="pv-tab">High <span style="color:var(--muted-2)">1</span></span>
+            <span class="pv-tab">Medium <span style="color:var(--muted-2)">1</span></span>
+            <span class="pv-tab">Low <span style="color:var(--muted-2)">1</span></span>
+          </div>
+
+          <div class="pv-card">
+            <div class="ctop">
+              <span>CONFIG ISSUE</span>
+              <span class="urg-h">ACTIVE</span>
+              <span class="cpath">payments / ConfigMap / payments-config</span>
+              <span class="csev">HIGH</span>
+            </div>
+            <h4>redis_base_url is empty</h4>
+            <div class="csub">A previously populated key is now empty. 3 pods of payments-api mount this configmap.</div>
+            <div class="conf">Confidence<div class="bar"><div></div></div><strong>92%</strong></div>
+            <div class="cmeta"><span>3 pods affected</span><span>14:32</span><span>detected 18s after edit</span></div>
+          </div>
+
+          <div class="pv-card med">
+            <div class="ctop">
+              <span>LOG ANOMALY</span>
+              <span class="urg-m">ACTIVE</span>
+              <span class="cpath">auth / Deployment / user-service</span>
+              <span class="csev">MEDIUM</span>
+            </div>
+            <h4>"User not found" errors started 6 min after rollout</h4>
+            <div class="csub">Errors started shortly after image-digest sha256:9876543… rolled out. 2 pods affected.</div>
+            <div class="conf">Confidence<div class="bar"><div></div></div><strong>78%</strong></div>
+            <div class="cmeta"><span>2 pods affected</span><span>14:28</span><span>detected 4m after rollout</span></div>
+          </div>
+
+          <div class="pv-card low">
+            <div class="ctop">
+              <span>CRASH LOOP</span>
+              <span class="urg-l">SETTLED</span>
+              <span class="cpath">platform / Deployment / ingest-worker</span>
+              <span class="csev">LOW</span>
+            </div>
+            <h4>Out-of-memory kill in ingest-worker</h4>
+            <div class="csub">Container exceeded memory limit and was killed. Likely cause: bump resources.limits.memory.</div>
+            <div class="conf">Confidence<div class="bar"><div></div></div><strong>64%</strong></div>
+            <div class="cmeta"><span>1 pod</span><span>13:51</span><span>auto-recovered</span></div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it actually catches</h2>
+    <p class="lede">Most K8s incidents are not log problems — they're misconfigured ConfigMaps, OOM kills, failed scheduling, image-pull errors, and bad rollouts. PodPulse watches all of them.</p>
+    <div class="features">
+      <div class="feature">
+        <h3><span class="indicator"></span> ConfigMap & Secret diff</h3>
+        <p>Detects empty values, malformed JSON, removed keys, value changes — and tells you which pods mount them. The differentiator. No other tool does this proactively.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="indicator"></span> New error after deploy</h3>
+        <p>Drain3 template clustering keyed by image-digest. Fires the moment a brand-new error template appears on a freshly rolled-out version.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="indicator"></span> K8s event fusion</h3>
+        <p>OOMKilled, FailedScheduling, BackOff, FailedMount, ImagePullBackOff — categorized and surfaced as actionable issues, not raw rows.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="indicator"></span> Severity-aware filtering</h3>
+        <p>Classifies every line by severity (JSON / logfmt / bracketed / keyword). Only WARN+ feeds the templater. Cuts ~70% of noise vs. naive log anomaly tools.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="indicator"></span> "What changed" timeline</h3>
+        <p>Per-namespace timeline of every deploy + configmap edit + observed issue. The single most useful debugging view.</p>
+      </div>
+      <div class="feature">
+        <h3><span class="indicator"></span> Audit + user onboarding</h3>
+        <p>Tracks who-changed-what via managedFields (no audit-webhook). Onboard teammates as scoped ServiceAccounts with a one-click kubeconfig.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="lede">Two binaries, one Helm command. No agents on your apps, no OpenTelemetry, no SDK. Reads container stdout/stderr directly + watches the K8s API.</p>
+    <div class="arch">
+<pre>┌──────────────────────────── Kubernetes cluster ────────────────────────────┐
+│                                                                            │
+│   pp-tailer (DaemonSet)              pp-detector (Deployment)              │
+│   ────────────────────                ──────────────────────                │
+│   reads /var/log/pods/*               K8s informers (pods, RS, svc,        │
+│   parses CRI format          ──HTTPS─►  configmaps, secrets, events)       │
+│   ships log batches                   Drain3 template miner                │
+│                                       Severity classifier                  │
+│                                       Issue engine (log + config + event)  │
+│                                       HTTP API + embedded SPA              │
+│                                       /k8s reverse proxy                   │
+└────────────────────────────────────┬───────────────────────────────────────┘
+                                     │
+                          Slack · Teams · SMTP · PagerDuty · webhook
+</pre>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="lede">One command. Templates-only storage by default — your raw logs never leave the cluster.</p>
+    <div class="install">
+<pre><span class="cmt"># Add the chart and install</span>
+helm repo add podpulse https://podpulse.github.io/charts
+helm install podpulse podpulse/podpulse \
+  --namespace podpulse --create-namespace \
+  --set alerts.slack.webhook=$SLACK_WEBHOOK
+
+<span class="cmt"># Open the dashboard</span>
+kubectl -n podpulse port-forward svc/podpulse-detector 8080:8080
+open https://localhost:8080</pre>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <h2>How it compares</h2>
+    <p class="lede">PodPulse is narrower than full observability platforms — and that's the point.</p>
+    <div class="compare">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Datadog Watchdog</th>
+            <th>Robusta</th>
+            <th>SigNoz</th>
+            <th>PodPulse</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Log anomaly detection</strong></td>
+            <td class="yes">Paid</td>
+            <td>Rule-based</td>
+            <td class="yes">Needs OTel</td>
+            <td class="you yes">Zero instrumentation</td>
+          </tr>
+          <tr>
+            <td><strong>ConfigMap diff with mount blast-radius</strong></td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+            <td class="you yes">Yes</td>
+          </tr>
+          <tr>
+            <td><strong>K8s events fused into incidents</strong></td>
+            <td>Partial</td>
+            <td class="yes">Yes</td>
+            <td class="no">No</td>
+            <td class="you yes">Yes</td>
+          </tr>
+          <tr>
+            <td><strong>Audit (who changed what)</strong></td>
+            <td>Paid add-on</td>
+            <td>Partial</td>
+            <td class="no">No</td>
+            <td class="you yes">Yes (managedFields)</td>
+          </tr>
+          <tr>
+            <td><strong>RBAC user onboarding from UI</strong></td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+            <td class="you yes">Yes</td>
+          </tr>
+          <tr>
+            <td><strong>Open source</strong></td>
+            <td class="no">No</td>
+            <td class="yes">Yes</td>
+            <td class="yes">Yes</td>
+            <td class="you yes">Apache-2.0</td>
+          </tr>
+          <tr>
+            <td><strong>Self-hosted</strong></td>
+            <td class="no">No</td>
+            <td class="yes">Yes</td>
+            <td class="yes">Yes</td>
+            <td class="you yes">Yes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;width:100%">
+    <div>PodPulse · Apache-2.0</div>
+    <div><a href="https://github.com/podpulse/podpulse" target="_blank">GitHub</a></div>
+  </div>
+</footer>
+
+</body>
+</html>

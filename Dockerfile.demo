@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1.7
+#
+# Public demo image — runs detector + a synthetic tailer in one
+# container. Intended for fly.io / Render / any free tier.
+# NOT for production cluster install (use the regular Dockerfile +
+# Helm chart for that).
+
+FROM --platform=$BUILDPLATFORM golang:1.26 AS build
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY . .
+ARG TARGETOS TARGETARCH
+ENV CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go build -trimpath -ldflags="-s -w" -o /out/pp-detector ./cmd/pp-detector && \
+    go build -trimpath -ldflags="-s -w" -o /out/podpulse-demo ./cmd/podpulse-demo
+
+# Use a base with /bin/sh so the demo wrapper can spawn the detector.
+FROM gcr.io/distroless/base-debian12:nonroot
+
+COPY --from=build /out/pp-detector    /usr/local/bin/pp-detector
+COPY --from=build /out/podpulse-demo  /usr/local/bin/podpulse-demo
+
+# fly.io / Render assign a port via $PORT.
+ENV PORT=8080
+EXPOSE 8080
+
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/podpulse-demo"]
