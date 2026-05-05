@@ -19,3 +19,4 @@
 # Local env
 .env
 *.local
+podpulse-demo
