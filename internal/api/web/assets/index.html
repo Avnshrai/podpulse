@@ -385,6 +385,82 @@
     z-index: 100;
   }
 
+  /* Auth screen */
+  .auth-screen {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    background: var(--bg);
+    z-index: 200;
+    padding: 24px;
+  }
+  .auth-card {
+    width: 100%; max-width: 400px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 32px 30px;
+  }
+  .auth-card .brand-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 22px;
+  }
+  .auth-card .brand-row .logo { width: 32px; height: 32px; border-radius: 7px; font-size: 14px; }
+  .auth-card .brand-row .name { font-size: 16px; font-weight: 600; }
+  .auth-card h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .auth-card .lede { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+  .auth-card .field { margin-bottom: 14px; }
+  .auth-card .field label { display: block; font-size: 11.5px; color: var(--muted-2); margin-bottom: 6px; }
+  .auth-card .field input {
+    width: 100%; background: var(--panel-2);
+    border: 1px solid var(--border-2); color: var(--text);
+    padding: 9px 12px; border-radius: 6px; font: inherit;
+  }
+  .auth-card .field input:focus { outline: none; border-color: var(--accent-2); }
+  .auth-card .submit {
+    width: 100%; padding: 10px;
+    background: var(--text); color: var(--bg);
+    border: 0; border-radius: 6px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    margin-top: 6px;
+  }
+  .auth-card .submit:disabled { opacity: .5; cursor: not-allowed; }
+  .auth-card .switch {
+    margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);
+    text-align: center; color: var(--muted); font-size: 12.5px;
+  }
+  .auth-card .switch a { color: var(--accent-2); cursor: pointer; }
+  .auth-card .err { color: var(--critical); font-size: 12px; margin: -8px 0 14px; }
+
+  /* User menu in topbar */
+  .user-menu { position: relative; }
+  .user-menu .pop {
+    position: absolute; top: 38px; right: 0;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px;
+    min-width: 220px; z-index: 50;
+    box-shadow: 0 12px 30px rgba(0,0,0,.5);
+    display: none;
+  }
+  .user-menu .pop.open { display: block; }
+  .user-menu .pop .row {
+    padding: 8px 10px; border-radius: 4px; cursor: pointer;
+    color: var(--muted); font-size: 12.5px;
+  }
+  .user-menu .pop .row:hover { background: var(--panel-2); color: var(--text); }
+  .user-menu .pop .info {
+    padding: 8px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .user-menu .pop .info .ln1 { color: var(--text); font-weight: 500; }
+  .user-menu .pop .info .ln2 { color: var(--muted-2); font-size: 11px; }
+  .role-chip {
+    display: inline-block; padding: 1px 7px; border-radius: 4px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+    background: var(--panel-2); color: var(--muted);
+    margin-left: 6px;
+  }
+  .role-chip.admin { color: var(--accent-2); }
+  .role-chip.member { color: var(--low); }
+
   /* Severity color helpers */
   .imp-label { font-size: 11px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; }
   .imp-label.low  { color: var(--low); }
@@ -483,7 +559,16 @@
     <div class="right">
       <div class="pill-status" id="status-pill"><span class="dot"></span><span id="status-text">All OK</span></div>
       <div class="icon-btn" title="Help">?</div>
-      <div class="avatar">A</div>
+      <div class="user-menu" id="user-menu" style="display:none">
+        <div class="avatar" id="user-avatar" title="Account">U</div>
+        <div class="pop" id="user-pop">
+          <div class="info">
+            <div class="ln1" id="user-pop-name">—</div>
+            <div class="ln2" id="user-pop-org">—</div>
+          </div>
+          <div class="row" id="user-pop-logout">Sign out</div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -563,6 +648,41 @@
   <main class="main" id="main"></main>
 </div>
 
+<!-- Auth gate. Hidden by default; JS shows it if /v1/auth/me returns 401. -->
+<div class="auth-screen" id="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="brand-row">
+      <div class="logo">P</div>
+      <div class="name">PodPulse</div>
+    </div>
+    <h2 id="auth-title">Sign in to your organization</h2>
+    <div class="lede" id="auth-lede">Welcome back. Enter your team email and password to continue.</div>
+    <form id="auth-form" autocomplete="on">
+      <div class="field" id="auth-org-field" style="display:none">
+        <label>Organization name</label>
+        <input id="f-org" autocomplete="organization" placeholder="Acme Inc">
+      </div>
+      <div class="field" id="auth-name-field" style="display:none">
+        <label>Your name (optional)</label>
+        <input id="f-name" autocomplete="name" placeholder="Alex Rivera">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="f-email" type="email" autocomplete="email" required placeholder="alex@acme.com">
+      </div>
+      <div class="field">
+        <label>Password <span style="color:var(--muted-2)" id="pw-hint"></span></label>
+        <input id="f-pw" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="err" id="auth-err" style="display:none"></div>
+      <button type="submit" class="submit" id="auth-submit">Sign in</button>
+    </form>
+    <div class="switch" id="auth-switch">
+      No account? <a id="auth-toggle">Create your organization</a>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   // ----- helpers -----
   const $ = s => document.querySelector(s);
@@ -604,6 +724,11 @@
     deployments:() => fetch('/v1/deployments').then(r => r.json()),
     audit:      q => fetch('/v1/audit?' + new URLSearchParams(q||{})).then(r => r.json()),
     auditActors:() => fetch('/v1/audit/actors').then(r => r.json()),
+    proxyAudit: q => fetch('/v1/proxy-audit?' + new URLSearchParams(q||{})).then(r => r.ok ? r.json() : ({events:[]})),
+    me:         () => fetch('/v1/auth/me'),
+    signup:     body => fetch('/v1/auth/signup', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}),
+    login:      body => fetch('/v1/auth/login',  {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}),
+    logout:     () => fetch('/v1/auth/logout',   {method:'POST'}),
     listUsers:  () => fetch(activeCluster ? `/v1/clusters/${activeCluster}/users` : '/v1/users').then(r => r.json()),
     createUser: body => fetch(activeCluster ? `/v1/clusters/${activeCluster}/users` : '/v1/users',
       {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
@@ -648,6 +773,10 @@
   }));
 
   function switchApp(app) {
+    // Members can never enter the admin app.
+    if (app === 'admin' && currentUser && currentUser.role !== 'admin') {
+      app = 'incidents';
+    }
     activeApp = app;
     // Highlight app entry
     $$('[data-app]').forEach(n => n.classList.toggle('active', n.dataset.app === app));
@@ -701,10 +830,160 @@
     }
   }
 
-  tick();
-  setInterval(tick, 5000);
-  refreshClusterPicker();
-  setInterval(refreshClusterPicker, 30_000);
+  // ----- Auth state + bootstrap -----
+  let currentUser = null;        // {user_id, org_id, org_name, org_slug, email, role, display_name}
+  let authMode = 'login';        // 'login' | 'signup'
+  let authAvailable = true;      // becomes false on first 200 from /me without auth
+
+  function showAuth(mode) {
+    authMode = mode;
+    const isSignup = mode === 'signup';
+    $('#auth-screen').style.display = 'flex';
+    document.querySelector('.app').style.display = 'none';
+    $('#auth-title').textContent = isSignup ? 'Create your organization' : 'Sign in to your organization';
+    $('#auth-lede').textContent  = isSignup
+      ? 'You will be the admin of this org. Invite teammates after sign in.'
+      : 'Welcome back. Enter your team email and password to continue.';
+    $('#auth-org-field').style.display  = isSignup ? '' : 'none';
+    $('#auth-name-field').style.display = isSignup ? '' : 'none';
+    $('#auth-submit').textContent = isSignup ? 'Create organization' : 'Sign in';
+    $('#auth-toggle').textContent = isSignup ? 'Sign in instead' : 'Create your organization';
+    $('#auth-switch').firstChild.textContent = isSignup ? 'Already have an account? ' : 'No account? ';
+    $('#pw-hint').textContent = isSignup ? '(8+ characters)' : '';
+    $('#f-pw').setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
+    $('#auth-err').style.display = 'none';
+    setTimeout(() => $((isSignup ? '#f-org' : '#f-email')).focus(), 50);
+  }
+  function hideAuth() {
+    $('#auth-screen').style.display = 'none';
+    document.querySelector('.app').style.display = '';
+  }
+
+  $('#auth-toggle').addEventListener('click', e => {
+    e.preventDefault();
+    showAuth(authMode === 'login' ? 'signup' : 'login');
+  });
+
+  $('#auth-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errBox = $('#auth-err');
+    const btn = $('#auth-submit');
+    errBox.style.display = 'none';
+    btn.disabled = true;
+    const origLabel = btn.textContent;
+    btn.textContent = (authMode === 'signup' ? 'Creating…' : 'Signing in…');
+    try {
+      const email = $('#f-email').value.trim();
+      const password = $('#f-pw').value;
+      let resp;
+      if (authMode === 'signup') {
+        resp = await api.signup({
+          org_name: $('#f-org').value.trim(),
+          display_name: $('#f-name').value.trim(),
+          email, password,
+        });
+      } else {
+        resp = await api.login({ email, password });
+      }
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(txt || ('HTTP ' + resp.status));
+      }
+      const data = await resp.json();
+      currentUser = data.identity || data;
+      onAuthed();
+    } catch (err) {
+      errBox.textContent = err.message || 'Sign in failed';
+      errBox.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+  });
+
+  // User menu popover
+  const userMenuEl = $('#user-menu');
+  $('#user-avatar').addEventListener('click', e => {
+    e.stopPropagation();
+    $('#user-pop').classList.toggle('open');
+  });
+  document.addEventListener('click', () => $('#user-pop').classList.remove('open'));
+  $('#user-pop-logout').addEventListener('click', async e => {
+    e.stopPropagation();
+    try { await api.logout(); } catch (_) {}
+    currentUser = null;
+    showAuth('login');
+    $('#user-pop').classList.remove('open');
+    userMenuEl.style.display = 'none';
+  });
+
+  function applyIdentityToUI() {
+    if (!currentUser) {
+      userMenuEl.style.display = 'none';
+      return;
+    }
+    userMenuEl.style.display = '';
+    const initial = (currentUser.display_name || currentUser.email || 'U').trim()[0].toUpperCase();
+    $('#user-avatar').textContent = initial || 'U';
+    $('#user-pop-name').innerHTML =
+      escapeHTML(currentUser.display_name || currentUser.email) +
+      ` <span class="role-chip ${currentUser.role}">${escapeHTML(currentUser.role || '')}</span>`;
+    $('#user-pop-org').textContent = currentUser.org_name || currentUser.org_slug || '';
+
+    // Role-based: members can't see Admin app at all.
+    const isAdmin = currentUser.role === 'admin';
+    const adminAppEntry = document.querySelector('[data-app="admin"]');
+    if (adminAppEntry) adminAppEntry.style.display = isAdmin ? '' : 'none';
+    // If a member somehow landed on admin, bounce them.
+    if (!isAdmin && activeApp === 'admin') {
+      switchApp('incidents');
+    }
+  }
+
+  async function checkAuth() {
+    try {
+      const r = await api.me();
+      if (r.status === 401) {
+        showAuth('login');
+        return false;
+      }
+      if (r.status === 404) {
+        // Auth not mounted (single-tenant fallback). Run unauthenticated.
+        authAvailable = false;
+        userMenuEl.style.display = 'none';
+        const adminAppEntry = document.querySelector('[data-app="admin"]');
+        if (adminAppEntry) adminAppEntry.style.display = '';
+        return true;
+      }
+      if (!r.ok) throw new Error('auth check failed');
+      currentUser = await r.json();
+      onAuthed();
+      return true;
+    } catch (e) {
+      // Network or other failure — fall back to showing the app
+      // (so the demo doesn't lock out if Postgres briefly hiccups).
+      console.warn('auth check failed', e);
+      authAvailable = false;
+      return true;
+    }
+  }
+
+  function onAuthed() {
+    hideAuth();
+    applyIdentityToUI();
+  }
+
+  // Initial bootstrap: auth → app
+  (async () => {
+    const authed = await checkAuth();
+    if (authed) {
+      // Either authenticated, or auth-disabled single-tenant mode.
+      tick();
+      refreshClusterPicker();
+    }
+  })();
+  setInterval(() => { if (authAvailable === false || currentUser) tick(); }, 5000);
+  setInterval(() => { if (authAvailable === false || currentUser) refreshClusterPicker(); }, 30_000);
 
   // Cluster picker dropdown
   const picker = $('#cluster-picker');
@@ -1163,6 +1442,36 @@
       });
     }
     m.append(list);
+
+    // ----- Proxy audit (per-request kubectl traffic via /k8s/<id>/...) -----
+    // Only meaningful when multi-tenant auth is wired and the caller is admin.
+    if (currentUser && currentUser.role === 'admin') {
+      const sinceMap = { '1h':'1h', '6h':'6h', '24h':'24h' };
+      let pdata;
+      try { pdata = await api.proxyAudit({ since: sinceMap[auditFilter.since] || '24h', limit: 200 }); }
+      catch (_) { pdata = { events: [] }; }
+      if (pdata && pdata.available !== false) {
+        const pcard = el('div','pcard');
+        pcard.append(el('h2','',`kubectl proxy traffic (${(pdata.events||[]).length})`));
+        pcard.append(el('div','meta','Per-request audit of every call routed through PodPulse to a cluster apiserver. Captured by the multi-cluster proxy.'));
+        if (!pdata.events || !pdata.events.length) {
+          pcard.append(el('div','empty','No proxy traffic in this window. kubectl through PodPulse is quiet.'));
+        } else {
+          const ph = el('div','audit-row');
+          ph.style.cssText = 'color:var(--muted-2);text-transform:uppercase;font-size:10.5px;letter-spacing:.05em';
+          ph.innerHTML = `<div>Time</div><div>User</div><div>Method</div><div>Path</div><div>Status</div>`;
+          pcard.append(ph);
+          pdata.events.forEach(ev => {
+            const r = el('div','audit-row');
+            const statusCls = ev.status >= 500 ? 'high' : ev.status >= 400 ? 'med' : 'low';
+            const clusterShort = ev.cluster_id ? ev.cluster_id.slice(0,8) : '—';
+            r.innerHTML = `<div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(ev.time)}</div><div><strong>${escapeHTML(ev.user||'anonymous')}</strong><div class="meta">cluster ${escapeHTML(clusterShort)}</div></div><div style="color:var(--muted-2);text-transform:uppercase;font-size:11px">${escapeHTML(ev.method||'')}</div><div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;word-break:break-all">${escapeHTML(ev.path||'')}<div class="meta">${ev.duration_ms||0} ms${ev.client_ip?' · '+escapeHTML(ev.client_ip):''}</div></div><div><span class="imp-label ${statusCls}">${ev.status||'?'}</span></div>`;
+            pcard.append(r);
+          });
+        }
+        m.append(pcard);
+      }
+    }
   }
 
   async function renderChannels() {

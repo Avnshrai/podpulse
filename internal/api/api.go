@@ -33,6 +33,7 @@ import (
 	"github.com/podpulse/podpulse/internal/anomaly"
 	"github.com/podpulse/podpulse/internal/detect/templates"
 	"github.com/google/uuid"
+	"github.com/podpulse/podpulse/internal/auth"
 	"github.com/podpulse/podpulse/internal/clusters"
 	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
@@ -58,6 +59,7 @@ type Server struct {
 	auditWatcher  *ppk8s.AuditWatcher
 	userManager   *users.Manager
 	clusterStore  *clusters.Store
+	authMgr       *auth.Manager
 	issueEngine   *issue.Engine
 	channels      []string
 	startedAt     time.Time
@@ -74,6 +76,7 @@ type Options struct {
 	AuditWatcher  *ppk8s.AuditWatcher
 	UserManager   *users.Manager
 	ClusterStore  *clusters.Store
+	Auth          *auth.Manager
 	IssueEngine   *issue.Engine
 	Channels      []string
 }
@@ -90,6 +93,7 @@ func NewServer(opts Options) *Server {
 		auditWatcher:  opts.AuditWatcher,
 		userManager:   opts.UserManager,
 		clusterStore:  opts.ClusterStore,
+		authMgr:       opts.Auth,
 		issueEngine:   opts.IssueEngine,
 		channels:      opts.Channels,
 		startedAt:     time.Now(),
@@ -137,6 +141,15 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/clusters", s.handleRegisterCluster)
 	mux.HandleFunc("DELETE /v1/clusters/{id}", s.handleDeleteCluster)
 
+	// Auth endpoints (only mounted when Postgres + auth manager exist).
+	if s.authMgr != nil && s.authMgr.Available() {
+		mux.HandleFunc("POST /v1/auth/signup", s.handleSignup)
+		mux.HandleFunc("POST /v1/auth/login", s.handleLogin)
+		mux.HandleFunc("POST /v1/auth/logout", s.handleLogout)
+		mux.HandleFunc("GET /v1/auth/me", s.handleAuthMe)
+		mux.HandleFunc("GET /v1/proxy-audit", s.handleProxyAuditList)
+	}
+
 	// Cluster-scoped onboarding flow.
 	mux.HandleFunc("GET /v1/clusters/{id}/users", s.handleListClusterUsers)
 	mux.HandleFunc("POST /v1/clusters/{id}/users", s.handleCreateClusterUser)
@@ -168,7 +181,111 @@ func (s *Server) Routes() http.Handler {
 			fs.ServeHTTP(w, r)
 		}))
 	}
-	return mux
+
+	// Wrap the whole mux in the auth middleware: it resolves the
+	// session token (cookie or Bearer) into an Identity stored in the
+	// request context. Handlers can pull it via auth.IdentityFromContext.
+	// Single-tenant fallback: when authMgr is unavailable, requests
+	// flow through with a nil Identity — handlers treat that as
+	// "no org scoping".
+	return s.authMiddleware(mux)
+}
+
+// authMiddleware resolves the session and gates protected endpoints.
+//
+// Always allowed (even unauthenticated):
+//   /healthz, /v1/auth/*, /k8s/* (kubectl uses its own SA bearer),
+//   GET / and any static asset under the SPA root.
+//
+// Gated when auth is available:
+//   every other /v1/* call requires a valid session.
+//
+// Admin-only writes:
+//   POST/DELETE on /v1/clusters, /v1/users, /v1/clusters/*/users.
+//   Members get 403.
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		// Always-public paths.
+		if isPublicPath(path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// /k8s/* uses its own bearer-token auth at the apiserver layer.
+		if strings.HasPrefix(path, "/k8s/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if s.authMgr == nil || !s.authMgr.Available() {
+			// Single-tenant fallback — no auth wired up, let everything through.
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		token := auth.TokenFromRequest(r)
+		ident, err := s.authMgr.Resolve(r.Context(), token)
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Admin-only writes.
+		if isAdminOnly(r) && !ident.IsAdmin() {
+			http.Error(w, "forbidden: admin role required", http.StatusForbidden)
+			return
+		}
+
+		r = r.WithContext(auth.WithIdentity(r.Context(), ident))
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isPublicPath(p string) bool {
+	switch p {
+	case "/healthz":
+		return true
+	}
+	if strings.HasPrefix(p, "/v1/auth/") {
+		return true
+	}
+	// Static SPA: anything not under /v1.
+	if !strings.HasPrefix(p, "/v1/") {
+		return true
+	}
+	return false
+}
+
+func isAdminOnly(r *http.Request) bool {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		return false
+	}
+	p := r.URL.Path
+	switch {
+	case p == "/v1/clusters":
+		return true
+	case strings.HasPrefix(p, "/v1/clusters/") && strings.Contains(p, "/users"):
+		return true
+	case p == "/v1/users":
+		return true
+	case strings.HasPrefix(p, "/v1/clusters/"): // DELETE /v1/clusters/{id}
+		return true
+	case strings.HasPrefix(p, "/v1/users/"):
+		return true
+	}
+	return false
+}
+
+// orgFromCtx returns the calling org's UUID, or uuid.Nil for
+// single-tenant fallback.
+func orgFromCtx(r *http.Request) uuid.UUID {
+	id := auth.IdentityFromContext(r.Context())
+	if id == nil {
+		return uuid.Nil
+	}
+	return id.OrgID
 }
 
 // --- Ingest ---
@@ -1010,6 +1127,165 @@ func humanizeSeconds(s int) string {
 	return strconv.Itoa(s/3600) + "h"
 }
 
+// --- Auth (multi-tenant) ---
+
+type signupReq struct {
+	OrgName     string `json:"org_name"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	DisplayName string `json:"display_name"`
+}
+
+func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
+	var body signupReq
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&body); err != nil {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+	token, ident, err := s.authMgr.Signup(r.Context(), body.OrgName, body.Email, body.Password, body.DisplayName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	auth.SetSessionCookie(w, r, token)
+	writeJSON(w, map[string]any{
+		"identity": identityWire(ident),
+		"token":    token,
+	})
+}
+
+type loginReq struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	var body loginReq
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&body); err != nil {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+	token, ident, err := s.authMgr.Login(r.Context(), body.Email, body.Password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	auth.SetSessionCookie(w, r, token)
+	writeJSON(w, map[string]any{
+		"identity": identityWire(ident),
+		"token":    token,
+	})
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	tok := auth.TokenFromRequest(r)
+	_ = s.authMgr.Logout(r.Context(), tok)
+	auth.ClearSessionCookie(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {
+	tok := auth.TokenFromRequest(r)
+	ident, err := s.authMgr.Resolve(r.Context(), tok)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	writeJSON(w, identityWire(ident))
+}
+
+func identityWire(i *auth.Identity) map[string]any {
+	return map[string]any{
+		"user_id":      i.UserID,
+		"org_id":       i.OrgID,
+		"org_name":     i.OrgName,
+		"org_slug":     i.OrgSlug,
+		"email":        i.Email,
+		"role":         i.Role,
+		"display_name": i.Display,
+	}
+}
+
+// --- Proxy audit log ---
+
+func (s *Server) handleProxyAuditList(w http.ResponseWriter, r *http.Request) {
+	if s.authMgr == nil || !s.authMgr.Available() {
+		writeJSON(w, map[string]any{"events": []any{}, "count": 0, "available": false})
+		return
+	}
+	q := r.URL.Query()
+	limit := 200
+	if v := q.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
+	since := time.Now().Add(-24 * time.Hour)
+	if v := q.Get("since"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			since = time.Now().Add(-d)
+		}
+	}
+	orgID := orgFromCtx(r)
+
+	type row struct {
+		Time      time.Time `json:"time"`
+		ClusterID string    `json:"cluster_id,omitempty"`
+		User      string    `json:"user,omitempty"`
+		Method    string    `json:"method"`
+		Path      string    `json:"path"`
+		Status    int       `json:"status"`
+		Duration  int       `json:"duration_ms"`
+		ClientIP  string    `json:"client_ip,omitempty"`
+	}
+
+	// We use the auth manager's pool indirectly via a direct query.
+	// Reuses the same connection pool; tenant isolation enforced via
+	// `WHERE org_id = $1` (or NULL match in single-tenant mode).
+	pool := s.authMgr.Pool()
+	if pool == nil {
+		writeJSON(w, map[string]any{"events": []any{}, "count": 0, "available": false})
+		return
+	}
+
+	var rows pgxRows
+	var err error
+	if orgID == uuid.Nil {
+		rows, err = pool.Query(r.Context(), `
+			SELECT ts, cluster_id::text, COALESCE(user_name,''), method, path, status, duration_ms, COALESCE(client_ip,'')
+			FROM proxy_audit WHERE ts >= $1 ORDER BY ts DESC LIMIT $2`,
+			since, limit)
+	} else {
+		rows, err = pool.Query(r.Context(), `
+			SELECT ts, cluster_id::text, COALESCE(user_name,''), method, path, status, duration_ms, COALESCE(client_ip,'')
+			FROM proxy_audit
+			WHERE org_id = $1 AND ts >= $2 ORDER BY ts DESC LIMIT $3`,
+			orgID, since, limit)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	out := []row{}
+	for rows.Next() {
+		var x row
+		if err := rows.Scan(&x.Time, &x.ClusterID, &x.User, &x.Method, &x.Path, &x.Status, &x.Duration, &x.ClientIP); err != nil {
+			continue
+		}
+		out = append(out, x)
+	}
+	writeJSON(w, map[string]any{"events": out, "count": len(out), "available": true})
+}
+
+// pgxRows is the small slice of pgx.Rows we use, declared as an
+// interface so this file doesn't have to import pgx directly.
+type pgxRows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Close()
+}
+
 func confidenceForDeploy(d deploymentView, all []*anomaly.Stored) int {
 	for _, a := range all {
 		if a.Workload == d.Workload && a.DeploymentCorrelated && a.Confidence > 0 {
@@ -1191,7 +1467,7 @@ func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"clusters": []any{}, "count": 0, "available": false})
 		return
 	}
-	list, err := s.clusterStore.List(r.Context())
+	list, err := s.clusterStore.List(r.Context(), orgFromCtx(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1215,7 +1491,11 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	c, err := s.clusterStore.Register(r.Context(), body.Name, body.Kubeconfig, body.Description, "ui")
+	createdBy := "ui"
+	if id := auth.IdentityFromContext(r.Context()); id != nil {
+		createdBy = id.Email
+	}
+	c, err := s.clusterStore.Register(r.Context(), orgFromCtx(r), body.Name, body.Kubeconfig, body.Description, createdBy)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1233,7 +1513,7 @@ func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad id", http.StatusBadRequest)
 		return
 	}
-	if err := s.clusterStore.Delete(r.Context(), id); err != nil {
+	if err := s.clusterStore.Delete(r.Context(), orgFromCtx(r), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

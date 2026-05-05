@@ -40,6 +40,7 @@ type Cluster struct {
 	Name          string    `json:"name"`
 	APIServerURL  string    `json:"apiserver_url"`
 	Description   string    `json:"description,omitempty"`
+	OrgID         uuid.UUID `json:"-"`               // tenant scope; never returned to wire
 	CreatedAt     time.Time `json:"created_at"`
 	CreatedBy     string    `json:"created_by,omitempty"`
 }
@@ -73,8 +74,9 @@ func New(d *db.DB) *Store {
 }
 
 // Register validates a kubeconfig (must list nodes) and persists it.
-// Returns the new cluster row.
-func (s *Store) Register(ctx context.Context, name, kubeconfigYAML, description, createdBy string) (*Cluster, error) {
+// orgID may be uuid.Nil for single-tenant mode; multi-tenant callers
+// MUST pass the caller's org id so the row is filterable.
+func (s *Store) Register(ctx context.Context, orgID uuid.UUID, name, kubeconfigYAML, description, createdBy string) (*Cluster, error) {
 	if name == "" {
 		return nil, errors.New("cluster name required")
 	}
@@ -90,12 +92,12 @@ func (s *Store) Register(ctx context.Context, name, kubeconfigYAML, description,
 		return nil, fmt.Errorf("kubeconfig works structurally but the cluster is unreachable: %w", err)
 	}
 
-	// Reject duplicate names so the UI can show a clear error.
+	// Reject duplicate names within the same org.
 	s.mu.RLock()
 	for _, c := range s.rows {
-		if c.Name == name {
+		if c.Name == name && c.OrgID == orgID {
 			s.mu.RUnlock()
-			return nil, fmt.Errorf("a cluster named %q is already registered", name)
+			return nil, fmt.Errorf("a cluster named %q is already registered in this organization", name)
 		}
 	}
 	s.mu.RUnlock()
@@ -105,14 +107,19 @@ func (s *Store) Register(ctx context.Context, name, kubeconfigYAML, description,
 		Name:         name,
 		APIServerURL: server,
 		Description:  description,
+		OrgID:        orgID,
 		CreatedAt:    time.Now(),
 		CreatedBy:    createdBy,
 	}
 	if s.d != nil {
+		var orgArg any = orgID
+		if orgID == uuid.Nil {
+			orgArg = nil
+		}
 		_, err := s.d.Pool.Exec(ctx, `
-			INSERT INTO clusters (id, name, apiserver_url, kubeconfig, description, created_by)
-			VALUES ($1, $2, $3, $4, $5, $6)`,
-			row.ID, row.Name, row.APIServerURL, kubeconfigYAML, description, createdBy)
+			INSERT INTO clusters (id, org_id, name, apiserver_url, kubeconfig, description, created_by)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			row.ID, orgArg, row.Name, row.APIServerURL, kubeconfigYAML, description, createdBy)
 		if err != nil {
 			return nil, fmt.Errorf("persist cluster: %w", err)
 		}
@@ -134,7 +141,8 @@ func (s *Store) LoadAll(ctx context.Context) error {
 		return nil
 	}
 	rows, err := s.d.Pool.Query(ctx, `
-		SELECT id, name, apiserver_url, kubeconfig, COALESCE(description,''),
+		SELECT id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::uuid),
+		       name, apiserver_url, kubeconfig, COALESCE(description,''),
 		       created_at, COALESCE(created_by,'')
 		FROM clusters`)
 	if err != nil {
@@ -144,7 +152,7 @@ func (s *Store) LoadAll(ctx context.Context) error {
 	for rows.Next() {
 		var c Cluster
 		var cfgYAML string
-		if err := rows.Scan(&c.ID, &c.Name, &c.APIServerURL, &cfgYAML,
+		if err := rows.Scan(&c.ID, &c.OrgID, &c.Name, &c.APIServerURL, &cfgYAML,
 			&c.Description, &c.CreatedAt, &c.CreatedBy); err != nil {
 			continue
 		}
@@ -162,33 +170,43 @@ func (s *Store) LoadAll(ctx context.Context) error {
 	return rows.Err()
 }
 
-// List returns every registered cluster.
-func (s *Store) List(ctx context.Context) ([]*Cluster, error) {
-	// Always serve from the in-memory mirror — populated either by
-	// LoadAll() at boot (DB mode) or by Register() at runtime.
+// List returns clusters scoped to the calling org. Pass uuid.Nil for
+// single-tenant mode (returns all clusters with no org).
+func (s *Store) List(ctx context.Context, orgID uuid.UUID) ([]*Cluster, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make([]*Cluster, 0, len(s.rows))
 	for _, c := range s.rows {
+		if !sameOrg(c.OrgID, orgID) {
+			continue
+		}
 		copy := c
 		out = append(out, &copy)
 	}
 	return out, nil
 }
 
-// Get returns one cluster by ID.
-func (s *Store) Get(ctx context.Context, id uuid.UUID) (*Cluster, error) {
+// Get returns one cluster by ID, scoped by org. Returns "not found"
+// (not "forbidden") when an org tries to access a cluster from another
+// org, to avoid leaking cluster existence across tenants.
+func (s *Store) Get(ctx context.Context, orgID, id uuid.UUID) (*Cluster, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	c, ok := s.rows[id]
-	if !ok {
+	if !ok || !sameOrg(c.OrgID, orgID) {
 		return nil, errors.New("not found")
 	}
 	return &c, nil
 }
 
-// Delete removes a cluster (and cascades onboarded_users via FK when DB-backed).
-func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
+// Delete removes a cluster, scoped to the org. Same isolation as Get.
+func (s *Store) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	s.mu.RLock()
+	c, ok := s.rows[id]
+	s.mu.RUnlock()
+	if !ok || !sameOrg(c.OrgID, orgID) {
+		return errors.New("not found")
+	}
 	if s.d != nil {
 		if _, err := s.d.Pool.Exec(ctx, `DELETE FROM clusters WHERE id = $1`, id); err != nil {
 			return err
@@ -201,6 +219,16 @@ func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
 	delete(s.rows, id)
 	s.mu.Unlock()
 	return nil
+}
+
+// sameOrg returns true when callerOrg matches the row's OrgID, OR
+// callerOrg is uuid.Nil (single-tenant fallback / legacy in-cluster
+// mode where no auth is configured).
+func sameOrg(rowOrg, callerOrg uuid.UUID) bool {
+	if callerOrg == uuid.Nil {
+		return true
+	}
+	return rowOrg == callerOrg
 }
 
 // Client returns the cached typed client for a cluster.

@@ -29,6 +29,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/podpulse/podpulse/internal/auth"
 	"github.com/podpulse/podpulse/internal/clusters"
 	"github.com/podpulse/podpulse/internal/db"
 	"github.com/podpulse/podpulse/internal/issue"
@@ -190,6 +191,17 @@ func main() {
 		}
 	}
 
+	// Auth: only when Postgres is connected. Without auth, the
+	// detector runs single-tenant (legacy mode) — every API call
+	// passes through with no org filter.
+	var authMgr *auth.Manager
+	if dbConn != nil {
+		authMgr = auth.New(dbConn.Pool)
+		slog.Info("multi-tenant auth enabled")
+	} else {
+		slog.Info("auth disabled — running single-tenant (no Postgres)")
+	}
+
 	// Wire cluster-scoped onboarding so /v1/clusters/{id}/users uses
 	// the per-cluster kubeconfig instead of the in-cluster default SA.
 	if userMgr != nil {
@@ -232,6 +244,7 @@ func main() {
 		AuditWatcher:  auditWatcher,
 		UserManager:   userMgr,
 		ClusterStore:  clusterStore,
+		Auth:          authMgr,
 		IssueEngine:   issueEngine,
 		Channels:      channels,
 	})
