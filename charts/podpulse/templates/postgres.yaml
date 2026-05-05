@@ -1,0 +1,123 @@
+{{- if .Values.postgres.enabled }}
+# Bundled Postgres for PodPulse persistence:
+#  - clusters (BYO kubeconfig registry)
+#  - onboarded_users
+#  - proxy_audit (per-request audit log)
+#
+# This is intentionally a single-replica StatefulSet with a small PVC.
+# It's NOT a production HA Postgres — for that, point PodPulse at your
+# managed Postgres (Cloud SQL, RDS, Crunchy, etc.) by setting
+# postgres.enabled=false and providing postgres.dsn.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "podpulse.fullname" . }}-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podpulse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+type: Opaque
+stringData:
+  POSTGRES_USER: podpulse
+  POSTGRES_DB: podpulse
+  {{- if .Values.postgres.password }}
+  POSTGRES_PASSWORD: {{ .Values.postgres.password | quote }}
+  {{- else }}
+  # Auto-generated on first install. On subsequent upgrades we reuse
+  # whatever value is already in the Secret (via lookup) so the data
+  # on the PVC keeps working. --set postgres.password takes precedence.
+  {{- $existing := (lookup "v1" "Secret" .Release.Namespace (printf "%s-postgres" (include "podpulse.fullname" .))) }}
+  {{- if and $existing $existing.data $existing.data.POSTGRES_PASSWORD }}
+  POSTGRES_PASSWORD: {{ index $existing.data "POSTGRES_PASSWORD" | b64dec | quote }}
+  {{- else }}
+  POSTGRES_PASSWORD: {{ randAlphaNum 32 | quote }}
+  {{- end }}
+  {{- end }}
+  # Note: the actual DSN is composed at runtime in the detector
+  # deployment by concatenating $(POSTGRES_PASSWORD) — keeping the
+  # password out of any plaintext value field.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "podpulse.fullname" . }}-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podpulse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for the StatefulSet
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    {{- include "podpulse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "podpulse.fullname" . }}-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podpulse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  serviceName: {{ include "podpulse.fullname" . }}-postgres
+  selector:
+    matchLabels:
+      {{- include "podpulse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "podpulse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image | default "postgres:16-alpine" }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: {{ include "podpulse.fullname" . }}-postgres, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "podpulse.fullname" . }}-postgres, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: {{ include "podpulse.fullname" . }}-postgres, key: POSTGRES_DB } }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "podpulse", "-d", "podpulse"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "podpulse", "-d", "podpulse"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.postgres.storageClass }}
+        storageClassName: {{ .Values.postgres.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage | default "1Gi" }}
+{{- end }}

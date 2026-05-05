@@ -474,9 +474,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4"/></svg>
     </div>
     <span class="crumb-sep">/</span>
-    <div class="crumb" id="cluster-picker">
+    <div class="crumb" id="cluster-picker" style="position:relative">
       <span id="cluster-picker-label">in-cluster</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4"/></svg>
+      <div id="cluster-menu" style="display:none;position:absolute;top:32px;left:0;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:6px;min-width:240px;z-index:50;box-shadow:0 12px 30px rgba(0,0,0,.5)"></div>
     </div>
 
     <div class="right">
@@ -603,10 +604,14 @@
     deployments:() => fetch('/v1/deployments').then(r => r.json()),
     audit:      q => fetch('/v1/audit?' + new URLSearchParams(q||{})).then(r => r.json()),
     auditActors:() => fetch('/v1/audit/actors').then(r => r.json()),
-    listUsers:  () => fetch('/v1/users').then(r => r.json()),
-    createUser: body => fetch('/v1/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
-    deleteUser: name => fetch('/v1/users/' + encodeURIComponent(name), {method:'DELETE'}),
-    userKubeURL: name => '/v1/users/' + encodeURIComponent(name) + '/kubeconfig',
+    listUsers:  () => fetch(activeCluster ? `/v1/clusters/${activeCluster}/users` : '/v1/users').then(r => r.json()),
+    createUser: body => fetch(activeCluster ? `/v1/clusters/${activeCluster}/users` : '/v1/users',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
+      .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
+    deleteUser: name => fetch(activeCluster ? `/v1/clusters/${activeCluster}/users/${encodeURIComponent(name)}` : `/v1/users/${encodeURIComponent(name)}`,
+      {method:'DELETE'}),
+    userKubeURL: name => activeCluster ? `/v1/clusters/${activeCluster}/users/${encodeURIComponent(name)}/kubeconfig`
+                                       : `/v1/users/${encodeURIComponent(name)}/kubeconfig`,
     listClusters: () => fetch('/v1/clusters').then(r => r.json()),
     registerCluster: body => fetch('/v1/clusters', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
     deleteCluster: id => fetch('/v1/clusters/' + encodeURIComponent(id), {method:'DELETE'}),
@@ -618,6 +623,8 @@
   let activeRoute = 'overview';
   let activeSeverity = '';
   let lastSummary = null;
+  let activeCluster = '';           // empty = in-cluster default
+  let knownClusters = [];           // populated from /v1/clusters
 
   const incidentRoutes = { overview: renderOverview, issues: renderIssues, changes: renderChanges, workloads: renderWorkloads, deployments: renderDeployments, services: renderServices };
   const adminRoutes = { clusters: renderClusters, users: renderUsers, audit: renderAudit, channels: renderChannels, settings: renderSettings };
@@ -696,6 +703,42 @@
 
   tick();
   setInterval(tick, 5000);
+  refreshClusterPicker();
+  setInterval(refreshClusterPicker, 30_000);
+
+  // Cluster picker dropdown
+  const picker = $('#cluster-picker');
+  const menu = $('#cluster-menu');
+  picker.addEventListener('click', e => {
+    e.stopPropagation();
+    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+  });
+  document.addEventListener('click', () => { menu.style.display = 'none'; });
+
+  async function refreshClusterPicker() {
+    try {
+      const data = await api.listClusters();
+      knownClusters = data.clusters || [];
+      menu.innerHTML = '';
+      const inCluster = el('div','nav-item' + (activeCluster===''?' active':''),'in-cluster <span class="meta" style="margin-left:auto;font-size:11px;color:var(--muted-2)">default</span>');
+      inCluster.style.padding = '7px 10px';
+      inCluster.onclick = () => { activeCluster=''; setClusterLabel(); menu.style.display='none'; lastSig=null; rerender(); };
+      menu.append(inCluster);
+      knownClusters.forEach(c => {
+        const it = el('div','nav-item' + (activeCluster===c.id?' active':''), escapeHTML(c.name));
+        it.style.padding = '7px 10px';
+        it.onclick = () => { activeCluster=c.id; setClusterLabel(); menu.style.display='none'; lastSig=null; rerender(); };
+        menu.append(it);
+      });
+      setClusterLabel();
+    } catch(e) {/*silent*/}
+  }
+  function setClusterLabel() {
+    const lbl = $('#cluster-picker-label');
+    if (!activeCluster) { lbl.textContent = 'in-cluster'; return; }
+    const c = knownClusters.find(c => c.id === activeCluster);
+    lbl.textContent = c ? c.name : activeCluster.slice(0,8);
+  }
 
   // -------------- INCIDENTS APP PAGES --------------
 

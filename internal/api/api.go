@@ -137,6 +137,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/clusters", s.handleRegisterCluster)
 	mux.HandleFunc("DELETE /v1/clusters/{id}", s.handleDeleteCluster)
 
+	// Cluster-scoped onboarding flow.
+	mux.HandleFunc("GET /v1/clusters/{id}/users", s.handleListClusterUsers)
+	mux.HandleFunc("POST /v1/clusters/{id}/users", s.handleCreateClusterUser)
+	mux.HandleFunc("DELETE /v1/clusters/{id}/users/{name}", s.handleDeleteClusterUser)
+	mux.HandleFunc("GET /v1/clusters/{id}/users/{name}/kubeconfig", s.handleClusterUserKubeconfig)
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "ok\n")
@@ -1100,11 +1106,82 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.PathValue("name")
-	if err := s.userManager.Remove(r.Context(), name); err != nil {
+	clusterID := r.URL.Query().Get("cluster_id")
+	if err := s.userManager.Remove(r.Context(), clusterID, name); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Cluster-scoped users ---
+
+func (s *Server) handleListClusterUsers(w http.ResponseWriter, r *http.Request) {
+	if s.userManager == nil {
+		writeJSON(w, map[string]any{"users": []any{}, "count": 0})
+		return
+	}
+	id := r.PathValue("id")
+	out := s.userManager.ListForCluster(id)
+	writeJSON(w, map[string]any{"users": out, "count": len(out)})
+}
+
+func (s *Server) handleCreateClusterUser(w http.ResponseWriter, r *http.Request) {
+	if s.userManager == nil {
+		http.Error(w, "user manager unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	id := r.PathValue("id")
+	var body createUserReq
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&body); err != nil {
+		http.Error(w, "bad body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	u := users.User{
+		Name: body.Name, Namespace: body.Namespace, Scope: body.Scope,
+		Description: body.Description, ClusterID: id,
+	}
+	out, err := s.userManager.OnboardInCluster(r.Context(), u)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, out)
+}
+
+func (s *Server) handleDeleteClusterUser(w http.ResponseWriter, r *http.Request) {
+	if s.userManager == nil {
+		http.Error(w, "user manager unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if err := s.userManager.Remove(r.Context(), r.PathValue("id"), r.PathValue("name")); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleClusterUserKubeconfig(w http.ResponseWriter, r *http.Request) {
+	if s.userManager == nil {
+		http.Error(w, "user manager unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	id := r.PathValue("id")
+	name := r.PathValue("name")
+	ttl := int64(3600)
+	if v := r.URL.Query().Get("ttl"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 && n <= 24*3600 {
+			ttl = n
+		}
+	}
+	cfg, err := s.userManager.Kubeconfig(r.Context(), id, name, ttl)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.kubeconfig"`)
+	_, _ = io.WriteString(w, cfg)
 }
 
 // --- Clusters (BYO kubeconfig) ---
@@ -1175,7 +1252,8 @@ func (s *Server) handleUserKubeconfig(w http.ResponseWriter, r *http.Request) {
 			ttl = n
 		}
 	}
-	cfg, err := s.userManager.Kubeconfig(r.Context(), name, ttl)
+	clusterID := r.URL.Query().Get("cluster_id")
+	cfg, err := s.userManager.Kubeconfig(r.Context(), clusterID, name, ttl)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

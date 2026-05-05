@@ -25,6 +25,10 @@ import (
 	"github.com/podpulse/podpulse/internal/api"
 	"github.com/podpulse/podpulse/internal/api/web"
 	"github.com/podpulse/podpulse/internal/detect/templates"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/podpulse/podpulse/internal/clusters"
 	"github.com/podpulse/podpulse/internal/db"
 	"github.com/podpulse/podpulse/internal/issue"
@@ -91,6 +95,7 @@ func main() {
 	var eventWatcher *ppk8s.EventWatcher
 	var auditWatcher *ppk8s.AuditWatcher
 	var userMgr *users.Manager
+	var fallbackProxy http.Handler
 	if *k8sEnabled {
 		client, err := ppk8s.NewClient(*kubeconfig)
 		if err != nil {
@@ -107,19 +112,20 @@ func main() {
 			// kubeconfigs when no --external-url is set.
 			apiUpstream := "https://kubernetes.default.svc"
 
-			// Mount the kubectl-compatible reverse proxy so
-			// kubeconfigs that point at PodPulse work transparently.
-			ph, perr := proxy.New(proxy.Config{
+			// In-cluster fallback proxy (legacy /k8s/api/... path with
+			// no cluster_id). Multi-cluster paths /k8s/<id>/... are
+			// routed by MultiClusterProxy below.
+			fb, perr := proxy.New(proxy.Config{
 				Upstream:      apiUpstream,
 				StripPrefix:   "/k8s",
 				CABundle:      proxy.LoadInClusterCA(),
-				AllowInsecure: proxy.LoadInClusterCA() == nil, // dev-only fallback
+				AllowInsecure: proxy.LoadInClusterCA() == nil,
 			})
 			if perr != nil {
-				slog.Warn("k8s proxy disabled", "err", perr)
+				slog.Warn("k8s in-cluster fallback proxy disabled", "err", perr)
 			} else {
-				api.K8sAPIProxy = ph
-				slog.Info("k8s api proxy mounted at /k8s", "upstream", apiUpstream)
+				fallbackProxy = fb
+				slog.Info("k8s in-cluster proxy mounted at /k8s/api/...", "upstream", apiUpstream)
 			}
 
 			// User-facing apiserver URL used in generated kubeconfigs.
@@ -182,6 +188,37 @@ func main() {
 		if err := clusterStore.LoadAll(ctx); err != nil {
 			slog.Warn("could not preload clusters from DB", "err", err)
 		}
+	}
+
+	// Wire cluster-scoped onboarding so /v1/clusters/{id}/users uses
+	// the per-cluster kubeconfig instead of the in-cluster default SA.
+	if userMgr != nil {
+		userMgr.ClusterLookup = func(clusterID string) (kubernetes.Interface, string, bool) {
+			id, err := uuid.Parse(clusterID)
+			if err != nil {
+				return nil, "", false
+			}
+			c, ok := clusterStore.Client(id)
+			if !ok {
+				return nil, "", false
+			}
+			url, _ := clusterStore.APIServerURL(id)
+			return c, url, true
+		}
+	}
+
+	// Mount the multi-cluster proxy. /k8s/<cluster_id>/... goes to the
+	// matching cluster; /k8s/api/... falls through to the in-cluster
+	// proxy. Per-request audit lands in proxy_audit when DB is on.
+	{
+		var pool *pgxpool.Pool
+		if dbConn != nil {
+			pool = dbConn.Pool
+		}
+		api.K8sAPIProxy = proxy.NewMultiCluster(clusterStore, fallbackProxy, pool)
+		slog.Info("multi-cluster /k8s proxy enabled",
+			"audit_db", pool != nil,
+			"fallback_in_cluster", fallbackProxy != nil)
 	}
 
 	server := api.NewServer(api.Options{

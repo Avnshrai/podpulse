@@ -45,6 +45,7 @@ type User struct {
 	Name        string    `json:"name"`
 	Namespace   string    `json:"namespace"`
 	Scope       Scope     `json:"scope"`
+	ClusterID   string    `json:"cluster_id,omitempty"` // empty = in-cluster
 	CreatedAt   time.Time `json:"created_at"`
 	CreatedBy   string    `json:"created_by,omitempty"`
 	Description string    `json:"description,omitempty"`
@@ -55,12 +56,23 @@ type User struct {
 	RoleBinding    string `json:"role_binding"`
 }
 
+// ClusterClientLookup returns the typed K8s client + apiserver URL
+// for the cluster identified by clusterID. Used by the cluster-scoped
+// onboarding path (BYO kubeconfig). Pass nil to disable cluster-scoped
+// onboarding and only support the in-cluster default flow.
+type ClusterClientLookup func(clusterID string) (cs kubernetes.Interface, apiserverURL string, ok bool)
+
 // Manager owns the onboarding flow.
 type Manager struct {
 	mu     sync.RWMutex
 	cs     kubernetes.Interface
-	users  map[string]User // name → user
-	server string          // apiserver URL injected into kubeconfigs
+	users  map[userKey]User // (cluster_id, name) → user; cluster_id="" for in-cluster
+	server string           // apiserver URL injected into kubeconfigs
+
+	// ClusterLookup, when set, enables /v1/clusters/{id}/users.
+	// The Manager will create SAs in the looked-up cluster instead of
+	// the in-process one.
+	ClusterLookup ClusterClientLookup
 
 	// InsecureTLS makes generated kubeconfigs skip TLS verification.
 	// Required when the user reaches PodPulse via plain HTTP (e.g. an
@@ -70,19 +82,40 @@ type Manager struct {
 	InsecureTLS bool
 }
 
+type userKey struct{ cluster, name string }
+
 func NewManager(cs kubernetes.Interface, apiServer string) *Manager {
 	return &Manager{
 		cs:     cs,
-		users:  map[string]User{},
+		users:  map[userKey]User{},
 		server: apiServer,
 	}
 }
 
 // Onboard creates the ServiceAccount + Role + RoleBinding in the
-// cluster and returns the full User record (incl. generated kubeconfig
-// will be served separately).
+// in-cluster K8s. For BYO clusters use OnboardInCluster.
 func (m *Manager) Onboard(ctx context.Context, u User) (User, error) {
-	if m.cs == nil {
+	return m.onboard(ctx, u, m.cs)
+}
+
+// OnboardInCluster creates the SA + Role + RoleBinding in the cluster
+// identified by u.ClusterID, using the kubeconfig stored at registration.
+func (m *Manager) OnboardInCluster(ctx context.Context, u User) (User, error) {
+	if u.ClusterID == "" {
+		return m.Onboard(ctx, u)
+	}
+	if m.ClusterLookup == nil {
+		return User{}, errors.New("cluster lookup not configured")
+	}
+	cs, _, ok := m.ClusterLookup(u.ClusterID)
+	if !ok {
+		return User{}, errors.New("unknown cluster_id")
+	}
+	return m.onboard(ctx, u, cs)
+}
+
+func (m *Manager) onboard(ctx context.Context, u User, cs kubernetes.Interface) (User, error) {
+	if cs == nil {
 		return User{}, errors.New("kubernetes client unavailable")
 	}
 	u.Name = sanitize(u.Name)
@@ -105,7 +138,7 @@ func (m *Manager) Onboard(ctx context.Context, u User) (User, error) {
 			Labels:    map[string]string{"app.kubernetes.io/managed-by": "podpulse", "podpulse.io/onboarded-user": u.Name},
 		},
 	}
-	if _, err := m.cs.CoreV1().ServiceAccounts(u.Namespace).Create(ctx, sa, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if _, err := cs.CoreV1().ServiceAccounts(u.Namespace).Create(ctx, sa, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 		return User{}, fmt.Errorf("create serviceaccount: %w", err)
 	}
 
@@ -118,12 +151,11 @@ func (m *Manager) Onboard(ctx context.Context, u User) (User, error) {
 		},
 		Rules: rulesFor(u.Scope),
 	}
-	if _, err := m.cs.RbacV1().Roles(u.Namespace).Create(ctx, role, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.RbacV1().Roles(u.Namespace).Create(ctx, role, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return User{}, fmt.Errorf("create role: %w", err)
 		}
-		// Update the existing role to match desired rules.
-		if _, err := m.cs.RbacV1().Roles(u.Namespace).Update(ctx, role, metav1.UpdateOptions{}); err != nil {
+		if _, err := cs.RbacV1().Roles(u.Namespace).Update(ctx, role, metav1.UpdateOptions{}); err != nil {
 			return User{}, fmt.Errorf("update role: %w", err)
 		}
 	}
@@ -142,7 +174,7 @@ func (m *Manager) Onboard(ctx context.Context, u User) (User, error) {
 			APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: roleName,
 		},
 	}
-	if _, err := m.cs.RbacV1().RoleBindings(u.Namespace).Create(ctx, rb, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if _, err := cs.RbacV1().RoleBindings(u.Namespace).Create(ctx, rb, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 		return User{}, fmt.Errorf("create rolebinding: %w", err)
 	}
 
@@ -152,29 +184,38 @@ func (m *Manager) Onboard(ctx context.Context, u User) (User, error) {
 	u.RoleBinding = bindingName
 
 	m.mu.Lock()
-	m.users[u.Name] = u
+	m.users[userKey{u.ClusterID, u.Name}] = u
 	m.mu.Unlock()
 	return u, nil
 }
 
-// Remove deletes the SA / Role / RoleBinding.
-func (m *Manager) Remove(ctx context.Context, name string) error {
+// Remove deletes the SA / Role / RoleBinding for (clusterID, name).
+// clusterID="" targets the in-cluster default flow.
+func (m *Manager) Remove(ctx context.Context, clusterID, name string) error {
 	m.mu.RLock()
-	u, ok := m.users[name]
+	u, ok := m.users[userKey{clusterID, name}]
 	m.mu.RUnlock()
 	if !ok {
 		return errors.New("user not found")
 	}
-	_ = m.cs.RbacV1().RoleBindings(u.Namespace).Delete(ctx, u.RoleBinding, metav1.DeleteOptions{})
-	_ = m.cs.RbacV1().Roles(u.Namespace).Delete(ctx, u.Role, metav1.DeleteOptions{})
-	_ = m.cs.CoreV1().ServiceAccounts(u.Namespace).Delete(ctx, u.ServiceAccount, metav1.DeleteOptions{})
+	cs := m.cs
+	if clusterID != "" && m.ClusterLookup != nil {
+		if c, _, ok := m.ClusterLookup(clusterID); ok {
+			cs = c
+		}
+	}
+	if cs != nil {
+		_ = cs.RbacV1().RoleBindings(u.Namespace).Delete(ctx, u.RoleBinding, metav1.DeleteOptions{})
+		_ = cs.RbacV1().Roles(u.Namespace).Delete(ctx, u.Role, metav1.DeleteOptions{})
+		_ = cs.CoreV1().ServiceAccounts(u.Namespace).Delete(ctx, u.ServiceAccount, metav1.DeleteOptions{})
+	}
 	m.mu.Lock()
-	delete(m.users, name)
+	delete(m.users, userKey{clusterID, name})
 	m.mu.Unlock()
 	return nil
 }
 
-// List returns all onboarded users.
+// List returns all onboarded users (across all clusters).
 func (m *Manager) List() []User {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -185,19 +226,33 @@ func (m *Manager) List() []User {
 	return out
 }
 
-// Get returns one user by name.
-func (m *Manager) Get(name string) (User, bool) {
+// ListForCluster returns onboarded users for a specific cluster.
+func (m *Manager) ListForCluster(clusterID string) []User {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	u, ok := m.users[name]
+	out := []User{}
+	for k, u := range m.users {
+		if k.cluster == clusterID {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// Get returns one user by (clusterID, name).
+func (m *Manager) Get(clusterID, name string) (User, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	u, ok := m.users[userKey{clusterID, name}]
 	return u, ok
 }
 
-// Kubeconfig generates a kubeconfig for the user. We mint a short-lived
-// TokenRequest (1h) — far safer than mounting the legacy SA token
-// secret.
-func (m *Manager) Kubeconfig(ctx context.Context, name string, ttlSeconds int64) (string, error) {
-	u, ok := m.Get(name)
+// Kubeconfig generates a kubeconfig for the user (clusterID="" for
+// the in-cluster legacy flow). The server URL is the PodPulse /k8s
+// proxy plus, for BYO clusters, the /<cluster_id>/ segment so kubectl
+// traffic routes to the right apiserver.
+func (m *Manager) Kubeconfig(ctx context.Context, clusterID, name string, ttlSeconds int64) (string, error) {
+	u, ok := m.Get(clusterID, name)
 	if !ok {
 		return "", errors.New("user not found")
 	}
@@ -205,32 +260,49 @@ func (m *Manager) Kubeconfig(ctx context.Context, name string, ttlSeconds int64)
 		ttlSeconds = 3600
 	}
 
+	cs := m.cs
+	if clusterID != "" && m.ClusterLookup != nil {
+		if c, _, ok := m.ClusterLookup(clusterID); ok {
+			cs = c
+		}
+	}
+	if cs == nil {
+		return "", errors.New("kubernetes client unavailable for this cluster")
+	}
+
 	// TokenRequest is the modern way (since 1.22) to mint short-lived
 	// SA tokens.
-	tr, err := m.cs.CoreV1().ServiceAccounts(u.Namespace).CreateToken(ctx, u.ServiceAccount,
+	tr, err := cs.CoreV1().ServiceAccounts(u.Namespace).CreateToken(ctx, u.ServiceAccount,
 		&authnv1.TokenRequest{Spec: authnv1.TokenRequestSpec{ExpirationSeconds: &ttlSeconds}},
 		metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("create token: %w", err)
 	}
 
+	// Server URL: base + /k8s + /<cluster_id> (if any). The Kubeconfig
+	// generator embeds this verbatim, so kubectl posts to the right
+	// path.
+	server := strings.TrimRight(m.server, "/")
+	if clusterID != "" {
+		server = server + "/" + clusterID
+	}
+
 	// If the kubeconfig points at PodPulse over plain HTTP (the typical
 	// SSH-tunnel case), emit insecure-skip-tls-verify and omit the CA.
-	// Otherwise embed the cluster CA the apiserver presents.
 	if m.InsecureTLS {
-		return renderKubeconfigInsecure(u, m.server, tr.Status.Token), nil
+		return renderKubeconfigInsecure(u, server, tr.Status.Token), nil
 	}
-	clusterCA, err := m.clusterCA(ctx)
+	clusterCA, err := m.clusterCA(ctx, cs)
 	if err != nil {
 		return "", err
 	}
-	return renderKubeconfig(u, m.server, clusterCA, tr.Status.Token), nil
+	return renderKubeconfig(u, server, clusterCA, tr.Status.Token), nil
 }
 
 // clusterCA grabs the cluster's CA bundle from the kube-root-ca.crt
 // ConfigMap (auto-mounted in every namespace).
-func (m *Manager) clusterCA(ctx context.Context) (string, error) {
-	cm, err := m.cs.CoreV1().ConfigMaps("default").Get(ctx, "kube-root-ca.crt", metav1.GetOptions{})
+func (m *Manager) clusterCA(ctx context.Context, cs kubernetes.Interface) (string, error) {
+	cm, err := cs.CoreV1().ConfigMaps("default").Get(ctx, "kube-root-ca.crt", metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("read cluster CA: %w", err)
 	}

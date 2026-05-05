@@ -37,9 +37,28 @@ tailer:
   extraArgs: []
 
 postgres:
-  # External Postgres connection string. Required.
-  # Example: postgres://podpulse:secret@postgres:5432/podpulse?sslmode=disable
+  # When true, deploy a single-replica Postgres StatefulSet alongside
+  # the detector. Persists onboarded users, registered clusters, and
+  # per-request /k8s-proxy audit log. Auto-generates a password on
+  # first install.
+  enabled: false
+  # Override the auto-generated password. When empty, a random 32-char
+  # password is generated once and reused on subsequent helm upgrades.
+  password: ""
+  # External Postgres connection string. Used when postgres.enabled=false
+  # AND postgres.dsn is non-empty. Example:
+  #   postgres://podpulse:secret@postgres:5432/podpulse?sslmode=disable
   dsn: ""
+  image: "postgres:16-alpine"
+  storage: "1Gi"
+  storageClass: ""  # cluster default
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 clickhouse:
   # External ClickHouse DSN. Required.

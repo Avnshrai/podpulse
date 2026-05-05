@@ -30,8 +30,18 @@ spec:
             - name: http
               containerPort: {{ .Values.detector.service.httpPort }}
           env:
+            {{- if .Values.postgres.enabled }}
+            # Compose DSN from the bundled-Postgres Secret. Using
+            # POSTGRES_PASSWORD as a separate env var lets us reference
+            # it inside the DSN without leaking it via the value field.
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "podpulse.fullname" . }}-postgres, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DSN
+              value: "postgres://podpulse:$(POSTGRES_PASSWORD)@{{ include "podpulse.fullname" . }}-postgres:5432/podpulse?sslmode=disable"
+            {{- else if .Values.postgres.dsn }}
             - name: POSTGRES_DSN
               value: {{ .Values.postgres.dsn | quote }}
+            {{- end }}
             - name: CLICKHOUSE_DSN
               value: {{ .Values.clickhouse.dsn | quote }}
             {{- if .Values.alerts.slack.webhook }}
