@@ -1,0 +1,27 @@
+# Render Blueprint — public hosted demo for PodPulse.
+#
+# How to deploy (one-time, ~2 min):
+#   1. Visit https://dashboard.render.com/blueprints
+#   2. Click "New Blueprint Instance"
+#   3. Connect GitHub if you haven't, then pick this repo (Avnshrai/podpulse)
+#   4. Render reads this file, shows you the service it'll create, click Apply
+#   5. Wait for the build (~3 min) and you'll have a public URL
+#
+# This service runs the single-process podpulse-demo binary — detector
+# + synthetic generator. No Kubernetes cluster required. The dashboard
+# always has a fresh anomaly to show because the generator simulates
+# a bad rollout every 2 minutes.
+
+services:
+  - type: web
+    name: podpulse-demo
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile.demo
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
