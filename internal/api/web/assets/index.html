@@ -385,50 +385,193 @@
     z-index: 100;
   }
 
-  /* Auth screen */
+  /* ============ Auth screen — split-pane with live pulse ============ */
   .auth-screen {
     position: fixed; inset: 0;
-    display: grid; place-items: center;
-    background: var(--bg);
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    background: #07080b;
     z-index: 200;
+    overflow: hidden;
+  }
+  /* Layered background: subtle dot grid + soft radial accent. */
+  .auth-screen::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      radial-gradient(ellipse 800px 400px at 20% 30%, rgba(110,231,183,.08), transparent 60%),
+      radial-gradient(ellipse 600px 500px at 80% 80%, rgba(96,165,250,.06), transparent 60%),
+      radial-gradient(rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size: auto, auto, 28px 28px;
+  }
+
+  /* LEFT: brand + tagline + animated pulse + feature pills + footer */
+  .auth-hero {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    padding: 56px 64px 48px;
+    border-right: 1px solid rgba(255,255,255,.06);
+    color: var(--text);
+  }
+  .auth-hero .brand {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 64px;
+  }
+  .auth-hero .brand .logo {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, #6ee7b7, #34d399);
+    color: #022; display: grid; place-items: center;
+    font-weight: 700; font-size: 16px;
+    box-shadow: 0 0 24px rgba(110,231,183,.35);
+  }
+  .auth-hero .brand .name { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .auth-hero .brand .pill {
+    margin-left: 6px; font-size: 10.5px;
+    background: rgba(110,231,183,.12); color: #6ee7b7;
+    padding: 2px 7px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
+  }
+
+  .auth-hero h1 {
+    font-size: 38px; line-height: 1.1; font-weight: 600;
+    letter-spacing: -.025em; margin: 0 0 20px;
+    color: #f4f5f6;
+  }
+  .auth-hero h1 em {
+    font-style: normal;
+    background: linear-gradient(120deg, #6ee7b7 0%, #93c5fd 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .auth-hero .tagline {
+    color: #9ca0a8; font-size: 15px; line-height: 1.55;
+    max-width: 480px; margin-bottom: 44px;
+  }
+
+  /* Animated pulse — the PodPulse namesake. Three rings rippling out. */
+  .auth-pulse {
+    position: relative;
+    width: 220px; height: 220px;
+    margin: 0 0 48px;
+  }
+  .auth-pulse .core {
+    position: absolute; inset: 50% auto auto 50%;
+    width: 14px; height: 14px;
+    background: #6ee7b7; border-radius: 50%;
+    transform: translate(-50%,-50%);
+    box-shadow: 0 0 24px rgba(110,231,183,.7);
+    animation: pulse-core 2.4s ease-in-out infinite;
+  }
+  .auth-pulse .ring {
+    position: absolute; inset: 50% auto auto 50%;
+    width: 14px; height: 14px;
+    border: 1.5px solid rgba(110,231,183,.6);
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+    animation: pulse-ring 2.4s cubic-bezier(.2,.8,.4,1) infinite;
+  }
+  .auth-pulse .ring.r2 { animation-delay: .8s; }
+  .auth-pulse .ring.r3 { animation-delay: 1.6s; }
+  @keyframes pulse-core {
+    0%,100% { box-shadow: 0 0 18px rgba(110,231,183,.55); }
+    50%     { box-shadow: 0 0 32px rgba(110,231,183,.95); }
+  }
+  @keyframes pulse-ring {
+    0%   { width: 14px; height: 14px; opacity: 1; border-width: 1.5px; }
+    100% { width: 220px; height: 220px; opacity: 0; border-width: .5px; }
+  }
+
+  .auth-features {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px;
+    max-width: 520px; margin-bottom: 32px;
+  }
+  .auth-features .feat {
+    display: flex; gap: 10px; align-items: flex-start;
+    font-size: 13px; color: #c5c8cc;
+  }
+  .auth-features .feat .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    margin-top: 6px; flex-shrink: 0;
+  }
+  .auth-features .feat:nth-child(1) .dot { background: #6ee7b7; }
+  .auth-features .feat:nth-child(2) .dot { background: #93c5fd; }
+  .auth-features .feat:nth-child(3) .dot { background: #fbbf24; }
+  .auth-features .feat:nth-child(4) .dot { background: #f472b6; }
+  .auth-features .feat strong { color: #f4f5f6; font-weight: 500; display: block; margin-bottom: 2px; font-size: 13px; }
+  .auth-features .feat span { color: #8a8e96; font-size: 12px; line-height: 1.45; }
+
+  .auth-hero .footer {
+    margin-top: auto; display: flex; align-items: center; gap: 16px;
+    color: #6a6e76; font-size: 12px;
+  }
+  .auth-hero .footer a { color: #9ca0a8; text-decoration: none; }
+  .auth-hero .footer a:hover { color: #f4f5f6; }
+  .auth-hero .footer .sep { width: 1px; height: 12px; background: rgba(255,255,255,.1); }
+
+  /* RIGHT: form */
+  .auth-pane {
+    position: relative; z-index: 1;
+    display: grid; place-items: center;
     padding: 24px;
   }
   .auth-card {
     width: 100%; max-width: 400px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 32px 30px;
+    background: rgba(20,22,26,.55);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 12px;
+    padding: 36px 36px 30px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.45);
   }
-  .auth-card .brand-row {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 22px;
+  .auth-card .brand-row { display: none; }    /* Brand lives on the left now */
+  .auth-card h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .auth-card .lede { color: var(--muted); font-size: 13px; margin-bottom: 26px; line-height: 1.5; }
+  .auth-card .field { margin-bottom: 16px; }
+  .auth-card .field label {
+    display: block; font-size: 11.5px; color: #9ca0a8;
+    margin-bottom: 6px; font-weight: 500;
   }
-  .auth-card .brand-row .logo { width: 32px; height: 32px; border-radius: 7px; font-size: 14px; }
-  .auth-card .brand-row .name { font-size: 16px; font-weight: 600; }
-  .auth-card h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-  .auth-card .lede { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
-  .auth-card .field { margin-bottom: 14px; }
-  .auth-card .field label { display: block; font-size: 11.5px; color: var(--muted-2); margin-bottom: 6px; }
   .auth-card .field input {
-    width: 100%; background: var(--panel-2);
-    border: 1px solid var(--border-2); color: var(--text);
-    padding: 9px 12px; border-radius: 6px; font: inherit;
+    width: 100%; background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08); color: var(--text);
+    padding: 10px 12px; border-radius: 7px; font: inherit;
+    transition: border-color .15s, background .15s;
   }
-  .auth-card .field input:focus { outline: none; border-color: var(--accent-2); }
+  .auth-card .field input:hover { border-color: rgba(255,255,255,.14); }
+  .auth-card .field input:focus {
+    outline: none; border-color: #6ee7b7;
+    background: rgba(110,231,183,.04);
+    box-shadow: 0 0 0 3px rgba(110,231,183,.08);
+  }
   .auth-card .submit {
-    width: 100%; padding: 10px;
-    background: var(--text); color: var(--bg);
-    border: 0; border-radius: 6px;
-    font-size: 13px; font-weight: 500; cursor: pointer;
-    margin-top: 6px;
+    width: 100%; padding: 11px;
+    background: linear-gradient(180deg, #f4f5f6 0%, #d4d6da 100%);
+    color: #07080b;
+    border: 0; border-radius: 7px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+    margin-top: 8px;
+    transition: transform .08s, box-shadow .15s;
+    box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 4px 12px rgba(0,0,0,.3);
   }
-  .auth-card .submit:disabled { opacity: .5; cursor: not-allowed; }
+  .auth-card .submit:hover { box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 6px 18px rgba(110,231,183,.2); }
+  .auth-card .submit:active { transform: translateY(1px); }
+  .auth-card .submit:disabled { opacity: .55; cursor: not-allowed; transform: none; }
   .auth-card .switch {
-    margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);
+    margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.06);
     text-align: center; color: var(--muted); font-size: 12.5px;
   }
-  .auth-card .switch a { color: var(--accent-2); cursor: pointer; }
-  .auth-card .err { color: var(--critical); font-size: 12px; margin: -8px 0 14px; }
+  .auth-card .switch a { color: #6ee7b7; cursor: pointer; font-weight: 500; }
+  .auth-card .switch a:hover { text-decoration: underline; }
+  .auth-card .err {
+    color: #f87171; font-size: 12px; margin: 0 0 14px;
+    padding: 8px 10px; background: rgba(248,113,113,.08);
+    border: 1px solid rgba(248,113,113,.2); border-radius: 6px;
+  }
+
+  /* Mobile collapse: stack form over hero, hide pulse + features. */
+  @media (max-width: 880px) {
+    .auth-screen { grid-template-columns: 1fr; }
+    .auth-hero { display: none; }
+    .auth-pane { padding: 32px 20px; }
+  }
 
   /* User menu in topbar */
   .user-menu { position: relative; }
@@ -650,37 +793,85 @@
 
 <!-- Auth gate. Hidden by default; JS shows it if /v1/auth/me returns 401. -->
 <div class="auth-screen" id="auth-screen" style="display:none">
-  <div class="auth-card">
-    <div class="brand-row">
+
+  <!-- Left: brand, tagline, animated pulse, feature highlights -->
+  <aside class="auth-hero">
+    <div class="brand">
       <div class="logo">P</div>
       <div class="name">PodPulse</div>
+      <span class="pill">Open source</span>
     </div>
-    <h2 id="auth-title">Sign in to your organization</h2>
-    <div class="lede" id="auth-lede">Welcome back. Enter your team email and password to continue.</div>
-    <form id="auth-form" autocomplete="on">
-      <div class="field" id="auth-org-field" style="display:none">
-        <label>Organization name</label>
-        <input id="f-org" autocomplete="organization" placeholder="Acme Inc">
-      </div>
-      <div class="field" id="auth-name-field" style="display:none">
-        <label>Your name (optional)</label>
-        <input id="f-name" autocomplete="name" placeholder="Alex Rivera">
-      </div>
-      <div class="field">
-        <label>Email</label>
-        <input id="f-email" type="email" autocomplete="email" required placeholder="alex@acme.com">
-      </div>
-      <div class="field">
-        <label>Password <span style="color:var(--muted-2)" id="pw-hint"></span></label>
-        <input id="f-pw" type="password" autocomplete="current-password" required>
-      </div>
-      <div class="err" id="auth-err" style="display:none"></div>
-      <button type="submit" class="submit" id="auth-submit">Sign in</button>
-    </form>
-    <div class="switch" id="auth-switch">
-      No account? <a id="auth-toggle">Create your organization</a>
+
+    <h1>The Kubernetes incident detector that tells you <em>what broke, when, and probably why.</em></h1>
+    <div class="tagline">
+      Zero instrumentation. Drop the agent in your cluster, and within seconds it's templating logs,
+      watching rollouts, and scoring blast radius. New errors after a deploy land in Slack with a
+      ready-to-paste rollback command.
     </div>
-  </div>
+
+    <div class="auth-pulse" aria-hidden="true">
+      <div class="ring"></div>
+      <div class="ring r2"></div>
+      <div class="ring r3"></div>
+      <div class="core"></div>
+    </div>
+
+    <div class="auth-features">
+      <div class="feat">
+        <span class="dot"></span>
+        <div><strong>Per-image-digest baselines</strong><span>Catches "new error after rollout," silences "we've seen that before."</span></div>
+      </div>
+      <div class="feat">
+        <span class="dot"></span>
+        <div><strong>Multi-cluster proxy</strong><span>Onboard kubeconfigs, generate scoped users, audit every kubectl call.</span></div>
+      </div>
+      <div class="feat">
+        <span class="dot"></span>
+        <div><strong>Slack + Teams + PagerDuty</strong><span>RCA sentence + suggested rollback, no robot-speak.</span></div>
+      </div>
+      <div class="feat">
+        <span class="dot"></span>
+        <div><strong>ConfigMap diff watcher</strong><span>Knows which workloads consume which config — blast radius on edit.</span></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <a href="https://github.com/Avnshrai/podpulse" target="_blank">github.com/Avnshrai/podpulse</a>
+      <div class="sep"></div>
+      <span>Apache-2.0 · v0.1</span>
+    </div>
+  </aside>
+
+  <!-- Right: signup / login form -->
+  <main class="auth-pane">
+    <div class="auth-card">
+      <h2 id="auth-title">Sign in to your organization</h2>
+      <div class="lede" id="auth-lede">Welcome back. Enter your team email and password to continue.</div>
+      <form id="auth-form" autocomplete="on">
+        <div class="field" id="auth-org-field" style="display:none">
+          <label>Organization name</label>
+          <input id="f-org" autocomplete="organization" placeholder="Acme Inc">
+        </div>
+        <div class="field" id="auth-name-field" style="display:none">
+          <label>Your name (optional)</label>
+          <input id="f-name" autocomplete="name" placeholder="Alex Rivera">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input id="f-email" type="email" autocomplete="email" required placeholder="alex@acme.com">
+        </div>
+        <div class="field">
+          <label>Password <span style="color:var(--muted-2)" id="pw-hint"></span></label>
+          <input id="f-pw" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="err" id="auth-err" style="display:none"></div>
+        <button type="submit" class="submit" id="auth-submit">Sign in</button>
+      </form>
+      <div class="switch" id="auth-switch">
+        No account? <a id="auth-toggle">Create your organization</a>
+      </div>
+    </div>
+  </main>
 </div>
 
 <script type="module">
@@ -838,7 +1029,8 @@
   function showAuth(mode) {
     authMode = mode;
     const isSignup = mode === 'signup';
-    $('#auth-screen').style.display = 'flex';
+    // Empty string lets the stylesheet's `display: grid` rule take over.
+    $('#auth-screen').style.display = '';
     document.querySelector('.app').style.display = 'none';
     $('#auth-title').textContent = isSignup ? 'Create your organization' : 'Sign in to your organization';
     $('#auth-lede').textContent  = isSignup
