@@ -25,3 +25,17 @@ services:
     envVars:
       - key: PORT
         value: "8080"
+      # Multi-tenant orgs/users/sessions live in Postgres. Without this
+      # the demo runs in single-tenant fallback (no signup screen).
+      - key: POSTGRES_DSN
+        fromDatabase:
+          name: podpulse-demo-db
+          property: connectionString
+      - key: PODPULSE_EXTERNAL_URL
+        value: https://podpulse-demo.onrender.com
+
+databases:
+  - name: podpulse-demo-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
