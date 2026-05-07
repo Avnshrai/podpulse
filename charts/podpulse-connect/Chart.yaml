@@ -1,0 +1,20 @@
+apiVersion: v2
+name: podpulse-connect
+description: |
+  PodPulse cluster-tunnel agent. Run this in any Kubernetes cluster you
+  want to manage from PodPulse SaaS. Dials home over outbound TLS — no
+  inbound firewall holes, no public apiserver, no VPN required.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kubernetes
+  - observability
+  - incident-detection
+  - reverse-tunnel
+home: https://github.com/Avnshrai/podpulse
+sources:
+  - https://github.com/Avnshrai/podpulse
+maintainers:
+  - name: PodPulse
+    url: https://github.com/Avnshrai/podpulse

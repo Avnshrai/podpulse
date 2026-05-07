@@ -36,13 +36,23 @@ import (
 
 // Cluster is one registered Kubernetes target.
 type Cluster struct {
-	ID            uuid.UUID `json:"id"`
-	Name          string    `json:"name"`
-	APIServerURL  string    `json:"apiserver_url"`
-	Description   string    `json:"description,omitempty"`
-	OrgID         uuid.UUID `json:"-"`               // tenant scope; never returned to wire
-	CreatedAt     time.Time `json:"created_at"`
-	CreatedBy     string    `json:"created_by,omitempty"`
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	APIServerURL string     `json:"apiserver_url,omitempty"`
+	Description  string     `json:"description,omitempty"`
+	OrgID        uuid.UUID  `json:"-"` // tenant scope; never returned to wire
+	CreatedAt    time.Time  `json:"created_at"`
+	CreatedBy    string     `json:"created_by,omitempty"`
+	// Onboarding mode. "kubeconfig" (paste a kubeconfig YAML) or
+	// "tunnel" (an agent dials home from the cluster).
+	ConnectMode  string     `json:"connect_mode"`
+	// Online is true when a tunnel agent is currently connected (for
+	// connect_mode='tunnel'). For kubeconfig mode it's always true (we
+	// can't easily tell — first kubectl call will reveal liveness).
+	Online       bool       `json:"online"`
+	LastSeen     *time.Time `json:"last_seen,omitempty"`
+	AgentVersion string     `json:"agent_version,omitempty"`
+	K8sVersion   string     `json:"k8s_version,omitempty"`
 }
 
 // Store persists clusters and caches their built K8s clients.
@@ -110,6 +120,8 @@ func (s *Store) Register(ctx context.Context, orgID uuid.UUID, name, kubeconfigY
 		OrgID:        orgID,
 		CreatedAt:    time.Now(),
 		CreatedBy:    createdBy,
+		ConnectMode:  "kubeconfig",
+		Online:       true, // BYO-kubeconfig clusters are assumed reachable; first kubectl call reveals truth
 	}
 	if s.d != nil {
 		var orgArg any = orgID
@@ -142,8 +154,11 @@ func (s *Store) LoadAll(ctx context.Context) error {
 	}
 	rows, err := s.d.Pool.Query(ctx, `
 		SELECT id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::uuid),
-		       name, apiserver_url, kubeconfig, COALESCE(description,''),
-		       created_at, COALESCE(created_by,'')
+		       name, COALESCE(apiserver_url,''), COALESCE(kubeconfig,''),
+		       COALESCE(description,''),
+		       created_at, COALESCE(created_by,''),
+		       COALESCE(connect_mode,'kubeconfig'), COALESCE(online,false),
+		       last_seen, COALESCE(agent_version,''), COALESCE(k8s_version,'')
 		FROM clusters`)
 	if err != nil {
 		return err
@@ -153,17 +168,21 @@ func (s *Store) LoadAll(ctx context.Context) error {
 		var c Cluster
 		var cfgYAML string
 		if err := rows.Scan(&c.ID, &c.OrgID, &c.Name, &c.APIServerURL, &cfgYAML,
-			&c.Description, &c.CreatedAt, &c.CreatedBy); err != nil {
-			continue
-		}
-		cs, _, err := buildClient([]byte(cfgYAML))
-		if err != nil {
+			&c.Description, &c.CreatedAt, &c.CreatedBy,
+			&c.ConnectMode, &c.Online, &c.LastSeen, &c.AgentVersion, &c.K8sVersion); err != nil {
 			continue
 		}
 		s.mu.Lock()
-		s.clients[c.ID] = cs
-		s.configs[c.ID] = cfgYAML
-		s.urls[c.ID] = c.APIServerURL
+		// Tunnel-mode clusters won't have a kubeconfig — that's OK.
+		if cfgYAML != "" {
+			if cs, _, err := buildClient([]byte(cfgYAML)); err == nil {
+				s.clients[c.ID] = cs
+			}
+			s.configs[c.ID] = cfgYAML
+		}
+		if c.APIServerURL != "" {
+			s.urls[c.ID] = c.APIServerURL
+		}
 		s.rows[c.ID] = c
 		s.mu.Unlock()
 	}
@@ -254,6 +273,57 @@ func (s *Store) KubeconfigYAML(id uuid.UUID) (string, bool) {
 	defer s.mu.RUnlock()
 	y, ok := s.configs[id]
 	return y, ok
+}
+
+// Mode returns the connect_mode for a cluster, or "" if unknown.
+// Used by the multi-cluster proxy to decide whether to dial a stored
+// kubeconfig or route through an agent tunnel.
+func (s *Store) Mode(id uuid.UUID) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c, ok := s.rows[id]
+	if !ok {
+		return ""
+	}
+	return c.ConnectMode
+}
+
+// RefreshFromDB reloads a single cluster row's metadata. Used after
+// the Hub creates a tunnel-mode cluster so the in-memory cache picks
+// it up without waiting for a server restart.
+func (s *Store) RefreshFromDB(ctx context.Context, id uuid.UUID) error {
+	if s.d == nil {
+		return nil
+	}
+	var c Cluster
+	var cfgYAML string
+	err := s.d.Pool.QueryRow(ctx, `
+		SELECT id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'::uuid),
+		       name, COALESCE(apiserver_url,''), COALESCE(kubeconfig,''),
+		       COALESCE(description,''),
+		       created_at, COALESCE(created_by,''),
+		       COALESCE(connect_mode,'kubeconfig'), COALESCE(online,false),
+		       last_seen, COALESCE(agent_version,''), COALESCE(k8s_version,'')
+		FROM clusters WHERE id = $1`, id).Scan(
+		&c.ID, &c.OrgID, &c.Name, &c.APIServerURL, &cfgYAML,
+		&c.Description, &c.CreatedAt, &c.CreatedBy,
+		&c.ConnectMode, &c.Online, &c.LastSeen, &c.AgentVersion, &c.K8sVersion)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if cfgYAML != "" {
+		s.configs[c.ID] = cfgYAML
+		if cs, _, err := buildClient([]byte(cfgYAML)); err == nil {
+			s.clients[c.ID] = cs
+		}
+	}
+	if c.APIServerURL != "" {
+		s.urls[c.ID] = c.APIServerURL
+	}
+	s.rows[c.ID] = c
+	s.mu.Unlock()
+	return nil
 }
 
 // --- helpers ---

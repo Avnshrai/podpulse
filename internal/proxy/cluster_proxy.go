@@ -40,18 +40,37 @@ import (
 // matching cluster's apiserver. Falls back to a default handler for
 // /k8s/... (no cluster_id) which usually points at the in-cluster
 // apiserver.
+//
+// Two upstream modes:
+//
+//   "kubeconfig" — cluster has a stored kubeconfig YAML; we build a
+//                  per-cluster TLS config from its CA and forward
+//                  directly to the apiserver URL.
+//   "tunnel"     — cluster is reachable only via a pp-connect agent
+//                  that has dialed home. We get an http.RoundTripper
+//                  from the connect.Hub that funnels each request
+//                  back through the WebSocket tunnel.
 type MultiClusterProxy struct {
 	store    *clusters.Store
 	fallback http.Handler // default /k8s proxy (single-cluster legacy)
 	pool     *pgxpool.Pool
+	tunnel   TunnelProvider // nil-safe: if nil, only kubeconfig mode works
 
 	// per-cluster proxy cache so we build httputil.ReverseProxy once.
 	cache map[uuid.UUID]*cachedProxy
 }
 
+// TunnelProvider is what connect.Hub satisfies. Decoupled to avoid
+// an import cycle (connect imports clusters → can't reverse).
+type TunnelProvider interface {
+	IsOnline(uuid.UUID) bool
+	RoundTripper(uuid.UUID) http.RoundTripper
+}
+
 type cachedProxy struct {
 	rp       *httputil.ReverseProxy
 	upstream *url.URL
+	tunnel   bool // true when this proxy routes through a pp-connect tunnel
 }
 
 // NewMultiCluster returns a handler for /k8s/* paths.
@@ -66,6 +85,13 @@ func NewMultiCluster(store *clusters.Store, fallback http.Handler, pool *pgxpool
 		pool:     pool,
 		cache:    map[uuid.UUID]*cachedProxy{},
 	}
+}
+
+// SetTunnelProvider wires in a TunnelProvider (typically *connect.Hub)
+// after construction. Done in main after both are built so we don't
+// need to thread the dep through every call site.
+func (m *MultiClusterProxy) SetTunnelProvider(t TunnelProvider) {
+	m.tunnel = t
 }
 
 func (m *MultiClusterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -115,13 +141,21 @@ func (m *MultiClusterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (m *MultiClusterProxy) serveCluster(w http.ResponseWriter, r *http.Request, id uuid.UUID, rest string) bool {
 	cp, ok := m.cache[id]
 	if !ok {
-		built, err := buildClusterProxy(m.store, id)
+		built, err := m.build(id)
 		if err != nil {
 			http.Error(w, "cluster proxy unavailable: "+err.Error(), http.StatusBadGateway)
 			return true // we handled it (with an error), no fallback
 		}
 		cp = built
 		m.cache[id] = built
+	}
+
+	// Tunnel-mode: gate on agent liveness. The cached transport stays
+	// valid across reconnects, so we keep it cached but refuse the
+	// request when the WS is down.
+	if cp.tunnel && m.tunnel != nil && !m.tunnel.IsOnline(id) {
+		http.Error(w, "cluster agent offline — install pp-connect or wait for it to reconnect", http.StatusBadGateway)
+		return true
 	}
 
 	// Rewrite path so the upstream sees the original Kubernetes API path
@@ -132,6 +166,36 @@ func (m *MultiClusterProxy) serveCluster(w http.ResponseWriter, r *http.Request,
 	r.Host = cp.upstream.Host
 	cp.rp.ServeHTTP(w, r)
 	return true
+}
+
+// build dispatches to the right per-cluster proxy constructor based
+// on the cluster's connect_mode.
+func (m *MultiClusterProxy) build(id uuid.UUID) (*cachedProxy, error) {
+	mode := m.store.Mode(id)
+	if mode == "tunnel" {
+		if m.tunnel == nil {
+			return nil, errClusterNotFound
+		}
+		return buildTunnelProxy(id, m.tunnel)
+	}
+	return buildClusterProxy(m.store, id)
+}
+
+// buildTunnelProxy constructs a ReverseProxy whose RoundTripper writes
+// every request through the agent's WebSocket. The "upstream URL" we
+// store is a synthetic http://apiserver scheme — the path/host info
+// is what's relayed to the agent, which forwards to its loopback
+// apiserver proxy. Plain HTTP because the agent does TLS locally.
+func buildTunnelProxy(id uuid.UUID, t TunnelProvider) (*cachedProxy, error) {
+	upstream, _ := url.Parse("http://apiserver")
+	rp := &httputil.ReverseProxy{
+		Transport:     t.RoundTripper(id),
+		FlushInterval: -1,
+		Director: func(req *http.Request) {
+			// Director already called from ServeHTTP; nothing else to do.
+		},
+	}
+	return &cachedProxy{rp: rp, upstream: upstream, tunnel: true}, nil
 }
 
 func buildClusterProxy(store *clusters.Store, id uuid.UUID) (*cachedProxy, error) {

@@ -1,0 +1,48 @@
+# Defaults for podpulse-connect.
+# Required values are saas.url and saas.token — provide them on the
+# command line:
+#
+#   helm install podpulse-connect oci://ghcr.io/avnshrai/charts/podpulse-connect \
+#     --namespace podpulse-system --create-namespace \
+#     --set saas.url=https://podpulse-demo.onrender.com \
+#     --set saas.token=ppc_xxx
+
+saas:
+  # Public PodPulse base URL — the agent dials $url/v1/connect.
+  url: ""
+  # Pairing/agent token from the "Connect via agent" form.
+  token: ""
+
+image:
+  repository: ghcr.io/avnshrai/podpulse/pp-connect
+  # Allow callers to pin an exact tag; falls back to chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Most clusters need cluster-admin so the agent can do everything
+# kubectl can do. Lock down via RBAC if you want a narrower scope.
+rbac:
+  create: true
+  clusterRoleName: cluster-admin
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# Optional. When the apiserver uses a non-default URL or self-signed
+# certs that the SA-mounted CA doesn't cover, set these.
+apiserver:
+  url: ""           # default: https://kubernetes.default.svc:443
+  insecureSkipVerify: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Hard-fail the install if saas.token is empty so people don't end up
+# with a Pod stuck in CrashLoopBackOff.
+strict: true

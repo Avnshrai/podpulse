@@ -1,0 +1,101 @@
+{{- if and .Values.strict (not .Values.saas.token) -}}
+{{- fail "saas.token is required (set --set saas.token=ppc_xxx). Get it from PodPulse → Admin → Clusters → Connect via agent." -}}
+{{- end -}}
+{{- if and .Values.strict (not .Values.saas.url) -}}
+{{- fail "saas.url is required (e.g. --set saas.url=https://podpulse-demo.onrender.com)" -}}
+{{- end -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "pp-connect.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "pp-connect.labels" . | nindent 4 }}
+{{- if .Values.rbac.create }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "pp-connect.fullname" . }}
+  labels: {{- include "pp-connect.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.rbac.clusterRoleName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "pp-connect.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "pp-connect.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "pp-connect.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  token: {{ .Values.saas.token | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pp-connect.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "pp-connect.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate     # only one tunnel per cluster — never run two
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "pp-connect.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels: {{- include "pp-connect.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "pp-connect.fullname" . }}
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent
+          image: {{ include "pp-connect.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PP_SAAS_URL
+              value: {{ .Values.saas.url | quote }}
+            - name: PP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pp-connect.fullname" . }}
+                  key: token
+            {{- with .Values.apiserver.url }}
+            - name: PP_APISERVER
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.apiserver.insecureSkipVerify }}
+            - name: PP_INSECURE
+              value: "1"
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # No ports exposed — the agent is purely outbound.
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

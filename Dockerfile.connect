@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.7
+#
+# pp-connect — PodPulse cluster-tunnel agent.
+#
+# Tiny static binary that customers run inside their cluster. Dials
+# home over outbound 443 to PodPulse SaaS, proxies kubectl traffic
+# back to the in-cluster apiserver.
+
+FROM --platform=$BUILDPLATFORM golang:1.26 AS build
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY . .
+
+ARG TARGETOS TARGETARCH
+ENV CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go build -trimpath -ldflags="-s -w" -o /out/pp-connect ./cmd/pp-connect
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=build /out/pp-connect /usr/local/bin/pp-connect
+
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/pp-connect"]

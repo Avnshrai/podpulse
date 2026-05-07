@@ -31,6 +31,7 @@ import (
 
 	"github.com/podpulse/podpulse/internal/auth"
 	"github.com/podpulse/podpulse/internal/clusters"
+	"github.com/podpulse/podpulse/internal/connect"
 	"github.com/podpulse/podpulse/internal/db"
 	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
@@ -219,19 +220,32 @@ func main() {
 		}
 	}
 
+	// Connect Hub: WebSocket endpoint where pp-connect agents dial in.
+	// Only meaningful when Postgres is up (pairing tokens live there).
+	var connectHub *connect.Hub
+	if dbConn != nil {
+		connectHub = connect.NewHub(dbConn.Pool, logger)
+		slog.Info("agent-tunnel hub enabled — pp-connect agents can dial /v1/connect")
+	}
+
 	// Mount the multi-cluster proxy. /k8s/<cluster_id>/... goes to the
 	// matching cluster; /k8s/api/... falls through to the in-cluster
 	// proxy. Per-request audit lands in proxy_audit when DB is on.
-	{
+	mcProxy := func() *proxy.MultiClusterProxy {
 		var pool *pgxpool.Pool
 		if dbConn != nil {
 			pool = dbConn.Pool
 		}
-		api.K8sAPIProxy = proxy.NewMultiCluster(clusterStore, fallbackProxy, pool)
-		slog.Info("multi-cluster /k8s proxy enabled",
-			"audit_db", pool != nil,
-			"fallback_in_cluster", fallbackProxy != nil)
+		return proxy.NewMultiCluster(clusterStore, fallbackProxy, pool)
+	}()
+	if connectHub != nil {
+		mcProxy.SetTunnelProvider(connectHub)
 	}
+	api.K8sAPIProxy = mcProxy
+	slog.Info("multi-cluster /k8s proxy enabled",
+		"audit_db", dbConn != nil,
+		"tunnel_mode", connectHub != nil,
+		"fallback_in_cluster", fallbackProxy != nil)
 
 	server := api.NewServer(api.Options{
 		Store:         store,
@@ -245,6 +259,7 @@ func main() {
 		UserManager:   userMgr,
 		ClusterStore:  clusterStore,
 		Auth:          authMgr,
+		ConnectHub:    connectHub,
 		IssueEngine:   issueEngine,
 		Channels:      channels,
 	})

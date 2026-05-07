@@ -604,6 +604,72 @@
   .role-chip.admin { color: var(--accent-2); }
   .role-chip.member { color: var(--low); }
 
+  /* Connect-via-agent UI */
+  .seg {
+    display: inline-flex; padding: 3px; gap: 2px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 7px; margin-bottom: 18px;
+  }
+  .seg button {
+    padding: 6px 14px; background: transparent; color: var(--muted);
+    border: 0; border-radius: 5px; font: inherit; font-size: 12.5px;
+    cursor: pointer;
+  }
+  .seg button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+
+  .copy-block {
+    position: relative;
+    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.06);
+    border-radius: 8px; padding: 14px 14px 14px 14px;
+    font: 11.5px ui-monospace, Menlo, monospace;
+    color: #d4d6da; line-height: 1.55;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .copy-block .copy-btn {
+    position: absolute; top: 8px; right: 8px;
+    padding: 5px 10px; background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1); color: var(--muted);
+    border-radius: 5px; font: inherit; font-size: 11px; cursor: pointer;
+  }
+  .copy-block .copy-btn:hover { background: rgba(255,255,255,.08); color: var(--text); }
+  .copy-block .copy-btn.copied { color: #6ee7b7; border-color: rgba(110,231,183,.3); }
+
+  .agent-status {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px; border-radius: 8px;
+    background: rgba(110,231,183,.04);
+    border: 1px solid rgba(110,231,183,.15);
+    margin-top: 18px;
+  }
+  .agent-status .pulse-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #fbbf24; box-shadow: 0 0 0 0 rgba(251,191,36,.4);
+    animation: agent-pulse 1.6s ease-out infinite;
+  }
+  .agent-status.online .pulse-dot { background: #6ee7b7; box-shadow: 0 0 0 0 rgba(110,231,183,.5); }
+  .agent-status.offline .pulse-dot { background: #6a6e76; animation: none; }
+  @keyframes agent-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(251,191,36,.5); }
+    100% { box-shadow: 0 0 0 12px rgba(251,191,36,0); }
+  }
+
+  .cluster-online-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .cluster-online-badge.online  { background: rgba(110,231,183,.1); color: #6ee7b7; }
+  .cluster-online-badge.offline { background: rgba(248,113,113,.1); color: #f87171; }
+  .cluster-online-badge .d {
+    width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  }
+  .cluster-mode-chip {
+    display: inline-block; padding: 1px 7px; border-radius: 4px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+    background: rgba(255,255,255,.04); color: var(--muted-2);
+  }
+
   /* Severity color helpers */
   .imp-label { font-size: 11px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; }
   .imp-label.low  { color: var(--low); }
@@ -931,6 +997,8 @@
     listClusters: () => fetch('/v1/clusters').then(r => r.json()),
     registerCluster: body => fetch('/v1/clusters', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
     deleteCluster: id => fetch('/v1/clusters/' + encodeURIComponent(id), {method:'DELETE'}),
+    createPairingToken: body => fetch('/v1/clusters/connect/token', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
+    connectStatus: token => fetch('/v1/clusters/connect/status/' + encodeURIComponent(token)).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }),
     channels:   () => fetch('/v1/channels').then(r => r.json()),
   };
 
@@ -983,6 +1051,8 @@
   function navigate(r) {
     activeRoute = r;
     $$('[data-route]').forEach(n => n.classList.toggle('active', n.dataset.route === r));
+    // Stop any in-flight pairing poller when leaving Clusters.
+    if (r !== 'clusters' && _pairPoller) { clearInterval(_pairPoller); _pairPoller = null; }
     rerender();
   }
 
@@ -1462,36 +1532,75 @@
 
   // -------------- ADMIN APP PAGES --------------
 
+  // Onboarding mode persists across rerenders so polling doesn't blow up the form.
+  let clusterOnboardingMode = 'agent'; // 'agent' | 'kubeconfig'
+
   async function renderClusters() {
     const data = await api.listClusters();
     const m = $('#main'); m.innerHTML = '';
     m.append(pageHead('Clusters'));
 
-    // Form
+    // Form card with mode selector
     const form = el('div','pcard');
     form.append(el('h2','','Register a cluster'));
-    form.append(el('div','sub','Upload a kubeconfig. PodPulse uses it to manage onboarded users in that cluster and to proxy kubectl traffic.'));
-    const grid = el('div','form-grid full');
-    grid.innerHTML = `
-      <div class="field"><label>Cluster name</label><input id="c-name" placeholder="dev-cluster-uae"></div>
-      <div class="field"><label>Description (optional)</label><input id="c-desc" placeholder="dev AKS in uaenorth"></div>
-      <div class="field"><label>kubeconfig (paste YAML)</label><textarea id="c-kube" placeholder="apiVersion: v1\nkind: Config\nclusters:\n- name: my-cluster\n  cluster:\n    server: https://...\n..."></textarea></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="c-go">Register cluster</button></div>
+    form.append(el('div','sub','Connect a Kubernetes cluster so you can onboard users, proxy kubectl, and audit every call.'));
+
+    const seg = el('div','seg');
+    seg.innerHTML = `
+      <button data-mode="agent">Connect via agent</button>
+      <button data-mode="kubeconfig">Paste kubeconfig</button>
     `;
-    form.append(grid);
-    grid.querySelector('#c-go').onclick = async () => {
-      const body = {
-        name:        grid.querySelector('#c-name').value.trim(),
-        description: grid.querySelector('#c-desc').value.trim(),
-        kubeconfig:  grid.querySelector('#c-kube').value,
+    form.append(seg);
+    seg.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === clusterOnboardingMode);
+      b.onclick = () => { clusterOnboardingMode = b.dataset.mode; renderClusters(); };
+    });
+
+    if (clusterOnboardingMode === 'kubeconfig') {
+      // ---- Legacy kubeconfig flow ----
+      form.append(el('div','sub','Use this when PodPulse can reach the apiserver directly (public endpoint, or both sides on the same VPN).'));
+      const grid = el('div','form-grid full');
+      grid.innerHTML = `
+        <div class="field"><label>Cluster name</label><input id="c-name" placeholder="dev-cluster-uae"></div>
+        <div class="field"><label>Description (optional)</label><input id="c-desc" placeholder="dev AKS in uaenorth"></div>
+        <div class="field"><label>kubeconfig (paste YAML)</label><textarea id="c-kube" placeholder="apiVersion: v1\nkind: Config\nclusters:\n- name: my-cluster\n  cluster:\n    server: https://...\n..."></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="c-go">Register cluster</button></div>
+      `;
+      form.append(grid);
+      grid.querySelector('#c-go').onclick = async () => {
+        const body = {
+          name:        grid.querySelector('#c-name').value.trim(),
+          description: grid.querySelector('#c-desc').value.trim(),
+          kubeconfig:  grid.querySelector('#c-kube').value,
+        };
+        if (!body.name || !body.kubeconfig) { toast('Name and kubeconfig are required'); return; }
+        try { await api.registerCluster(body); toast('Cluster registered'); lastSig=null; rerender(); }
+        catch(e) { toast('Failed: '+e.message); }
       };
-      if (!body.name || !body.kubeconfig) { toast('Name and kubeconfig are required'); return; }
-      try { await api.registerCluster(body); toast('Cluster registered'); lastSig=null; rerender(); }
-      catch(e) { toast('Failed: '+e.message); }
-    };
+    } else {
+      // ---- Agent-tunnel flow ----
+      form.append(el('div','sub','Run a tiny agent inside your cluster. It dials home over outbound 443 — no VPN, no firewall holes, no public apiserver. Required for private clusters.'));
+      const grid = el('div','form-grid full');
+      grid.innerHTML = `
+        <div class="field"><label>Cluster name</label><input id="ac-name" placeholder="dev-cluster-uae"></div>
+        <div class="field"><label>Description (optional)</label><input id="ac-desc" placeholder="AKS in uaenorth, behind VPN"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="ac-go">Generate install command</button></div>
+        <div id="ac-out"></div>
+      `;
+      form.append(grid);
+      grid.querySelector('#ac-go').onclick = async () => {
+        const name = grid.querySelector('#ac-name').value.trim();
+        const desc = grid.querySelector('#ac-desc').value.trim();
+        if (!name) { toast('Name is required'); return; }
+        try {
+          const t = await api.createPairingToken({ name, description: desc });
+          renderPairingResult(grid.querySelector('#ac-out'), t);
+        } catch(e) { toast('Failed: '+e.message); }
+      };
+    }
     m.append(form);
 
-    // List
+    // ---- Registered clusters list ----
     const list = el('div','pcard');
     list.append(el('h2','','Registered clusters'));
     if (!data.clusters || !data.clusters.length) {
@@ -1499,9 +1608,21 @@
     } else {
       data.clusters.forEach(c => {
         const row = el('div','cluster-card');
+        const onlineCls = c.online ? 'online' : 'offline';
+        const onlineLbl = c.online ? 'Online' : 'Offline';
+        const mode = c.connect_mode || 'kubeconfig';
+        const upstream = mode === 'tunnel'
+          ? `agent ${c.agent_version ? 'v'+escapeHTML(c.agent_version) : ''}`
+          : escapeHTML((c.apiserver_url||'').slice(0,40)) + ((c.apiserver_url||'').length>40?'…':'');
         row.innerHTML = `
-          <div><div class="name">${escapeHTML(c.name)}</div><div class="meta">${escapeHTML(c.description||'no description')}</div></div>
-          <div class="meta" style="font-family:ui-monospace,monospace">${escapeHTML((c.apiserver_url||'').slice(0,40))}${(c.apiserver_url||'').length>40?'…':''}</div>
+          <div>
+            <div class="name">${escapeHTML(c.name)}
+              <span class="cluster-online-badge ${onlineCls}"><span class="d"></span>${onlineLbl}</span>
+              <span class="cluster-mode-chip">${escapeHTML(mode)}</span>
+            </div>
+            <div class="meta">${escapeHTML(c.description||'no description')}${c.k8s_version?' · k8s '+escapeHTML(c.k8s_version):''}</div>
+          </div>
+          <div class="meta" style="font-family:ui-monospace,monospace">${upstream}</div>
           <div class="meta">added ${fmtAgo(c.created_at)}</div>
           <div><button class="btn danger" data-id="${c.id}">Remove</button></div>
         `;
@@ -1513,6 +1634,75 @@
       });
     }
     m.append(list);
+  }
+
+  // Renders the pairing result + starts polling for the agent to dial home.
+  function renderPairingResult(host, t) {
+    host.innerHTML = '';
+    const card = el('div','pcard');
+    card.style.cssText = 'margin-top:18px;background:rgba(110,231,183,.04);border-color:rgba(110,231,183,.18)';
+    card.innerHTML = `
+      <h3 style="margin:0 0 6px;font-size:14px;font-weight:600">Run this in your cluster</h3>
+      <div class="sub" style="margin-bottom:12px">Pipe to <code>kubectl apply -f -</code> or save and edit. The agent will dial home within seconds.</div>
+    `;
+
+    // YAML manifest block
+    const yamlBlock = el('div','copy-block');
+    const yamlPre = document.createTextNode(t.kubectl_yaml);
+    yamlBlock.append(yamlPre);
+    const yamlBtn = el('button','copy-btn','Copy');
+    yamlBtn.onclick = () => {
+      navigator.clipboard.writeText(t.kubectl_yaml);
+      yamlBtn.textContent = 'Copied'; yamlBtn.classList.add('copied');
+      setTimeout(() => { yamlBtn.textContent = 'Copy'; yamlBtn.classList.remove('copied'); }, 1500);
+    };
+    yamlBlock.append(yamlBtn);
+    card.append(yamlBlock);
+
+    // Tip line about helm
+    const tip = el('div','sub');
+    tip.style.cssText = 'margin:10px 0 4px;font-size:11.5px';
+    tip.textContent = 'Or use Helm:';
+    card.append(tip);
+    const helmBlock = el('div','copy-block');
+    helmBlock.append(document.createTextNode(t.helm_command));
+    const helmBtn = el('button','copy-btn','Copy');
+    helmBtn.onclick = () => {
+      navigator.clipboard.writeText(t.helm_command);
+      helmBtn.textContent = 'Copied'; helmBtn.classList.add('copied');
+      setTimeout(() => { helmBtn.textContent = 'Copy'; helmBtn.classList.remove('copied'); }, 1500);
+    };
+    helmBlock.append(helmBtn);
+    card.append(helmBlock);
+
+    // Live status
+    const status = el('div','agent-status');
+    status.innerHTML = `<div class="pulse-dot"></div><div><strong>Waiting for agent</strong><div class="meta">The agent will appear here once it connects (usually under 10 seconds after apply).</div></div>`;
+    card.append(status);
+    host.append(card);
+
+    // Poll status every 2s. Stop once paired & online (or when the user
+    // navigates away — the polling token is cleared on rerender).
+    pollPairing(t.token, status);
+  }
+
+  let _pairPoller = null;
+  async function pollPairing(token, statusEl) {
+    if (_pairPoller) clearInterval(_pairPoller);
+    _pairPoller = setInterval(async () => {
+      try {
+        const s = await api.connectStatus(token);
+        if (s.paired && s.online) {
+          statusEl.classList.remove('offline'); statusEl.classList.add('online');
+          statusEl.innerHTML = `<div class="pulse-dot"></div><div><strong>Agent connected ✓</strong><div class="meta">Cluster registered. Reloading the cluster list…</div></div>`;
+          clearInterval(_pairPoller); _pairPoller = null;
+          setTimeout(() => { lastSig=null; rerender(); }, 1500);
+        } else if (s.paired && !s.online) {
+          statusEl.classList.remove('online'); statusEl.classList.add('offline');
+          statusEl.innerHTML = `<div class="pulse-dot"></div><div><strong>Agent disconnected</strong><div class="meta">Was online but lost the connection. Will reconnect automatically.</div></div>`;
+        }
+      } catch(e) { /* token may have been cleaned up — silent */ }
+    }, 2000);
   }
 
   async function renderUsers() {

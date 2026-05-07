@@ -24,6 +24,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"github.com/podpulse/podpulse/internal/detect/templates"
 	"github.com/google/uuid"
 	"github.com/podpulse/podpulse/internal/auth"
+	"github.com/podpulse/podpulse/internal/connect"
 	"github.com/podpulse/podpulse/internal/clusters"
 	"github.com/podpulse/podpulse/internal/issue"
 	ppk8s "github.com/podpulse/podpulse/internal/k8s"
@@ -60,6 +62,7 @@ type Server struct {
 	userManager   *users.Manager
 	clusterStore  *clusters.Store
 	authMgr       *auth.Manager
+	connectHub    *connect.Hub
 	issueEngine   *issue.Engine
 	channels      []string
 	startedAt     time.Time
@@ -77,6 +80,7 @@ type Options struct {
 	UserManager   *users.Manager
 	ClusterStore  *clusters.Store
 	Auth          *auth.Manager
+	ConnectHub    *connect.Hub
 	IssueEngine   *issue.Engine
 	Channels      []string
 }
@@ -94,6 +98,7 @@ func NewServer(opts Options) *Server {
 		userManager:   opts.UserManager,
 		clusterStore:  opts.ClusterStore,
 		authMgr:       opts.Auth,
+		connectHub:    opts.ConnectHub,
 		issueEngine:   opts.IssueEngine,
 		channels:      opts.Channels,
 		startedAt:     time.Now(),
@@ -140,6 +145,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /v1/clusters", s.handleListClusters)
 	mux.HandleFunc("POST /v1/clusters", s.handleRegisterCluster)
 	mux.HandleFunc("DELETE /v1/clusters/{id}", s.handleDeleteCluster)
+
+	// Agent-tunnel onboarding (pp-connect dials home).
+	if s.connectHub != nil {
+		mux.HandleFunc("POST /v1/clusters/connect/token", s.handleCreatePairingToken)
+		mux.HandleFunc("GET /v1/clusters/connect/status/{token}", s.handleConnectStatus)
+		mux.Handle("/v1/connect", s.connectHub) // WS upgrade — agent dials this
+	}
 
 	// Auth endpoints (only mounted when Postgres + auth manager exist).
 	if s.authMgr != nil && s.authMgr.Available() {
@@ -247,6 +259,10 @@ func isPublicPath(p string) bool {
 	switch p {
 	case "/healthz":
 		return true
+	case "/v1/connect":
+		// WS endpoint — pp-connect agent authenticates with its own
+		// pairing token (X-PodPulse-Token header), not a session cookie.
+		return true
 	}
 	if strings.HasPrefix(p, "/v1/auth/") {
 		return true
@@ -265,6 +281,8 @@ func isAdminOnly(r *http.Request) bool {
 	p := r.URL.Path
 	switch {
 	case p == "/v1/clusters":
+		return true
+	case p == "/v1/clusters/connect/token":
 		return true
 	case strings.HasPrefix(p, "/v1/clusters/") && strings.Contains(p, "/users"):
 		return true
@@ -1518,6 +1536,186 @@ func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Agent-tunnel onboarding (pp-connect) ---
+
+type createPairingTokenReq struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (s *Server) handleCreatePairingToken(w http.ResponseWriter, r *http.Request) {
+	if s.connectHub == nil {
+		http.Error(w, "agent-tunnel not enabled (Postgres required)", http.StatusServiceUnavailable)
+		return
+	}
+	var body createPairingTokenReq
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&body); err != nil {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+	if body.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	createdBy := "ui"
+	if id := auth.IdentityFromContext(r.Context()); id != nil {
+		createdBy = id.Email
+	}
+	token, err := s.connectHub.CreatePairingToken(r.Context(), orgFromCtx(r), body.Name, body.Description, createdBy)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	saasURL := strings.TrimRight(externalURLFromRequest(r), "/")
+	helmCmd := strings.TrimSpace(`
+helm upgrade --install podpulse-connect oci://ghcr.io/avnshrai/charts/podpulse-connect \
+  --namespace podpulse-system --create-namespace \
+  --set saas.url=` + saasURL + ` \
+  --set saas.token=` + token)
+
+	kubectlYAML := buildAgentManifest(saasURL, token)
+
+	writeJSON(w, map[string]any{
+		"token":           token,
+		"expires_in_secs": 3600,
+		"helm_command":    helmCmd,
+		"kubectl_yaml":    kubectlYAML,
+	})
+}
+
+// handleConnectStatus polls a pairing token; returns whether the agent
+// has dialed home yet, and (when paired) the cluster_id to navigate to.
+func (s *Server) handleConnectStatus(w http.ResponseWriter, r *http.Request) {
+	if s.connectHub == nil || s.authMgr == nil || !s.authMgr.Available() {
+		http.Error(w, "agent-tunnel not enabled", http.StatusServiceUnavailable)
+		return
+	}
+	token := r.PathValue("token")
+	if !strings.HasPrefix(token, "ppc_") {
+		http.Error(w, "bad token", http.StatusBadRequest)
+		return
+	}
+	pool := s.authMgr.Pool()
+	if pool == nil {
+		http.Error(w, "no DB pool", http.StatusServiceUnavailable)
+		return
+	}
+	var (
+		usedAt    *time.Time
+		clusterID *uuid.UUID
+		expiresAt time.Time
+		orgID     *uuid.UUID
+	)
+	err := pool.QueryRow(r.Context(), `
+		SELECT used_at, cluster_id, expires_at, org_id
+		FROM pairing_tokens WHERE token = $1`, token).
+		Scan(&usedAt, &clusterID, &expiresAt, &orgID)
+	if err != nil {
+		http.Error(w, "token not found", http.StatusNotFound)
+		return
+	}
+	// Org isolation: poller must be on the same org as the token.
+	caller := orgFromCtx(r)
+	if caller != uuid.Nil && orgID != nil && *orgID != caller {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	online := false
+	if clusterID != nil {
+		online = s.connectHub.IsOnline(*clusterID)
+	}
+	out := map[string]any{
+		"paired":     clusterID != nil,
+		"online":     online,
+		"expires_at": expiresAt,
+	}
+	if clusterID != nil {
+		out["cluster_id"] = clusterID.String()
+	}
+	if usedAt != nil {
+		out["used_at"] = usedAt
+	}
+	writeJSON(w, out)
+}
+
+// externalURLFromRequest returns the public-facing URL the SPA was
+// loaded from. Used to pre-fill the helm command shown in the UI.
+func externalURLFromRequest(r *http.Request) string {
+	if v := os.Getenv("PODPULSE_EXTERNAL_URL"); v != "" {
+		return v
+	}
+	scheme := "http"
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	host := r.Host
+	if v := r.Header.Get("X-Forwarded-Host"); v != "" {
+		host = v
+	}
+	return scheme + "://" + host
+}
+
+// buildAgentManifest produces a self-contained YAML the user can pipe
+// to `kubectl apply -f -`. Saves them from needing helm.
+func buildAgentManifest(saasURL, token string) string {
+	const tmpl = `# pp-connect — PodPulse cluster-tunnel agent.
+# Apply with:  kubectl apply -f <(curl -s ...)   or  kubectl apply -f -
+apiVersion: v1
+kind: Namespace
+metadata: {name: podpulse-system}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: pp-connect, namespace: podpulse-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: pp-connect-admin}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: pp-connect
+  namespace: podpulse-system
+---
+apiVersion: v1
+kind: Secret
+metadata: {name: pp-connect-token, namespace: podpulse-system}
+type: Opaque
+stringData:
+  token: TOKEN_PLACEHOLDER
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: pp-connect, namespace: podpulse-system}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: pp-connect}}
+  template:
+    metadata: {labels: {app: pp-connect}}
+    spec:
+      serviceAccountName: pp-connect
+      containers:
+      - name: agent
+        image: ghcr.io/avnshrai/podpulse/pp-connect:latest
+        env:
+        - {name: PP_SAAS_URL, value: "SAAS_URL_PLACEHOLDER"}
+        - name: PP_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pp-connect-token
+              key: token
+        resources:
+          requests: {cpu: 50m, memory: 64Mi}
+          limits:   {cpu: 250m, memory: 256Mi}
+`
+	out := strings.ReplaceAll(tmpl, "TOKEN_PLACEHOLDER", token)
+	out = strings.ReplaceAll(out, "SAAS_URL_PLACEHOLDER", saasURL)
+	return out
 }
 
 func (s *Server) handleUserKubeconfig(w http.ResponseWriter, r *http.Request) {

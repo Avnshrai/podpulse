@@ -1,0 +1,14 @@
+PodPulse cluster-tunnel agent installed.
+
+The agent is dialing home to:
+  {{ .Values.saas.url }}
+
+Watch it come online (typically takes 5-10 seconds):
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/name={{ include "pp-connect.name" . }} -f
+
+Once you see "Connected to proxy" in the logs, the cluster will appear
+as Online ✓ on your PodPulse dashboard. From then on every kubectl call
+through PodPulse rides this tunnel — no inbound firewall, no VPN.
+
+Uninstall (the cluster row stays in PodPulse, marked Offline):
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
