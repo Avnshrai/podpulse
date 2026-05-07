@@ -34,6 +34,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -98,13 +99,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	saToken, err := os.ReadFile(*tokenPath)
-	if err != nil && !*insecureTLS {
+	tokenSrc := &tokenSource{path: *tokenPath}
+	if _, err := tokenSrc.read(); err != nil && !*insecureTLS {
 		slog.Warn("could not read SA token — proxying without bearer auth", "err", err)
 	}
-	saTokenStr := strings.TrimSpace(string(saToken))
 
-	k8sVersion := readK8sVersion(apiURL, tlsConfig, saTokenStr)
+	k8sVersion := readK8sVersion(apiURL, tlsConfig, tokenSrc.Get())
 	slog.Info("agent starting",
 		"saas", wsURL,
 		"apiserver", apiURL.String(),
@@ -117,7 +117,7 @@ func main() {
 	defer cancel()
 
 	// 1. Start the loopback apiserver proxy.
-	proxy := newAPIServerProxy(apiURL, tlsConfig, saTokenStr)
+	proxy := newAPIServerProxy(apiURL, tlsConfig, tokenSrc)
 	loopback := &http.Server{
 		Addr:              loopbackAddr,
 		Handler:           proxy,
@@ -180,8 +180,11 @@ func buildTLSConfig(caPath string, insecure bool, serverName string) (*tls.Confi
 
 // newAPIServerProxy returns a reverse proxy that forwards every
 // request to the in-cluster apiserver, replacing the Authorization
-// header with the agent's SA token.
-func newAPIServerProxy(target *url.URL, tlsCfg *tls.Config, bearer string) http.Handler {
+// header with the agent's SA token. The token is re-read from disk on
+// every request — projected SA tokens auto-rotate (default ≤1h
+// expiry, kubelet refreshes the file before expiry), so caching the
+// startup value would cause 401 Unauthorized after the first rotation.
+func newAPIServerProxy(target *url.URL, tlsCfg *tls.Config, tokens *tokenSource) http.Handler {
 	rp := httputil.NewSingleHostReverseProxy(target)
 	rp.FlushInterval = -1
 	rp.Transport = &http.Transport{
@@ -196,8 +199,8 @@ func newAPIServerProxy(target *url.URL, tlsCfg *tls.Config, bearer string) http.
 	rp.Director = func(req *http.Request) {
 		origDirector(req)
 		req.Host = target.Host
-		if bearer != "" {
-			req.Header.Set("Authorization", "Bearer "+bearer)
+		if t := tokens.Get(); t != "" {
+			req.Header.Set("Authorization", "Bearer "+t)
 		}
 		// Don't forward Host header from upstream — apiserver expects its own.
 		req.Header.Del("X-Forwarded-Host")
@@ -208,6 +211,48 @@ func newAPIServerProxy(target *url.URL, tlsCfg *tls.Config, bearer string) http.
 		http.Error(w, "apiserver unreachable: "+err.Error(), http.StatusBadGateway)
 	}
 	return rp
+}
+
+// tokenSource caches the on-disk ServiceAccount token with a 30-second
+// TTL. K8s rotates these tokens (kubelet rewrites the file ~80% of the
+// way through the expiry window), so we re-read frequently but not
+// per-request — that would syscall on every kubectl call.
+type tokenSource struct {
+	path string
+
+	mu       sync.RWMutex
+	cached   string
+	cachedAt time.Time
+}
+
+func (t *tokenSource) read() (string, error) {
+	b, err := os.ReadFile(t.path)
+	if err != nil {
+		return "", err
+	}
+	tok := strings.TrimSpace(string(b))
+	t.mu.Lock()
+	t.cached = tok
+	t.cachedAt = time.Now()
+	t.mu.Unlock()
+	return tok, nil
+}
+
+// Get returns a fresh token, re-reading from disk if the cached copy
+// is older than 30 seconds. Falls back to the cached value if the
+// file disappears momentarily.
+func (t *tokenSource) Get() string {
+	t.mu.RLock()
+	cached, age := t.cached, time.Since(t.cachedAt)
+	t.mu.RUnlock()
+	if cached != "" && age < 30*time.Second {
+		return cached
+	}
+	tok, err := t.read()
+	if err != nil {
+		return cached
+	}
+	return tok
 }
 
 // runTunnel keeps the WS open. ClientConnect blocks; on disconnect we
