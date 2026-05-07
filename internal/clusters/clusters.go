@@ -275,6 +275,19 @@ func (s *Store) KubeconfigYAML(id uuid.UUID) (string, bool) {
 	return y, ok
 }
 
+// OrgID returns the org that owns the given cluster, or uuid.Nil if
+// the cluster doesn't exist or wasn't tagged with an org. Unscoped on
+// purpose — used by the proxy audit path which only knows cluster_id
+// (the cluster ID is itself sensitive and acts as tenant scoping).
+func (s *Store) OrgID(id uuid.UUID) uuid.UUID {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if c, ok := s.rows[id]; ok {
+		return c.OrgID
+	}
+	return uuid.Nil
+}
+
 // Mode returns the connect_mode for a cluster, or "" if unknown.
 // Used by the multi-cluster proxy to decide whether to dial a stored
 // kubeconfig or route through an agent tunnel.

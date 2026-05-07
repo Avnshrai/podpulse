@@ -122,8 +122,16 @@ func (m *MultiClusterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// goroutine that logs in the background.
 	if m.pool != nil {
 		actor := actorFromBearer(r.Header.Get("Authorization"))
+		// Tenant scoping: stamp the row with the cluster's org. Without
+		// this every row lands with org_id=NULL and the audit page
+		// (which filters `WHERE org_id = $1`) hides every entry.
+		var orgID uuid.UUID
+		if isCluster && m.store != nil {
+			orgID = m.store.OrgID(clusterID)
+		}
 		event := proxyAuditRow{
 			ClusterID:  clusterID,
+			OrgID:      orgID,
 			UserName:   actor,
 			Method:     r.Method,
 			Path:       truncate(r.URL.Path, 1024),
@@ -280,6 +288,7 @@ func caFromKubeconfig(yamlBlob []byte) ([]byte, string, error) {
 
 type proxyAuditRow struct {
 	ClusterID  uuid.UUID
+	OrgID      uuid.UUID
 	UserName   string
 	Method     string
 	Path       string
@@ -298,10 +307,14 @@ func (e proxyAuditRow) insert(pool *pgxpool.Pool) {
 	if e.ClusterID == uuid.Nil {
 		clusterArg = nil
 	}
+	var orgArg any = e.OrgID
+	if e.OrgID == uuid.Nil {
+		orgArg = nil
+	}
 	_, _ = pool.Exec(ctx, `
-		INSERT INTO proxy_audit (cluster_id, user_name, method, path, status, duration_ms, client_ip)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		clusterArg, nullStr(e.UserName), e.Method, e.Path, e.Status, e.DurationMs, nullStr(e.ClientIP),
+		INSERT INTO proxy_audit (cluster_id, org_id, user_name, method, path, status, duration_ms, client_ip)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		clusterArg, orgArg, nullStr(e.UserName), e.Method, e.Path, e.Status, e.DurationMs, nullStr(e.ClientIP),
 	)
 }
 
