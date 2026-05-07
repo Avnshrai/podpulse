@@ -150,7 +150,9 @@ func (s *Server) Routes() http.Handler {
 	if s.connectHub != nil {
 		mux.HandleFunc("POST /v1/clusters/connect/token", s.handleCreatePairingToken)
 		mux.HandleFunc("GET /v1/clusters/connect/status/{token}", s.handleConnectStatus)
-		mux.Handle("/v1/connect", s.connectHub) // WS upgrade — agent dials this
+		// WS upgrade is a GET. Register per-method to avoid conflicting
+		// with the SPA's `GET /` catch-all under Go 1.22+ strict patterns.
+		mux.Handle("GET /v1/connect", s.connectHub)
 	}
 
 	// Auth endpoints (only mounted when Postgres + auth manager exist).
