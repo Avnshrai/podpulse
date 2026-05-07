@@ -42,6 +42,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rancher/remotedialer"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // AgentDialAddress is the magic destination string that the server
@@ -300,6 +302,30 @@ func (h *Hub) RoundTripper(clusterID uuid.UUID) http.RoundTripper {
 		ResponseHeaderTimeout: 60 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
+}
+
+// ClientForCluster returns a typed Kubernetes client whose Transport
+// rides the agent tunnel — every API call lands at the customer's
+// in-cluster apiserver via the agent's loopback proxy.
+//
+// Used for cluster-scoped user onboarding: when the SaaS has no
+// in-cluster k8s integration of its own (--k8s=false), we still need
+// a clientset to create ServiceAccounts / Roles / RoleBindings in
+// tunnel-connected clusters.
+func (h *Hub) ClientForCluster(clusterID uuid.UUID) (kubernetes.Interface, error) {
+	if !h.IsOnline(clusterID) {
+		return nil, fmt.Errorf("cluster %s has no live agent", clusterID)
+	}
+	cfg := &rest.Config{
+		// Host is unused once Transport is set, but client-go validates
+		// it as a syntactically-valid URL. The tunnel ignores the host.
+		Host: "http://apiserver",
+		// Plain HTTP — the agent does TLS termination locally.
+		Transport: h.RoundTripper(clusterID),
+		// Generous timeouts; kubectl traffic is interactive.
+		Timeout: 60 * time.Second,
+	}
+	return kubernetes.NewForConfig(cfg)
 }
 
 // --- Pairing token API ---

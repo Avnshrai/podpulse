@@ -1258,15 +1258,33 @@
 
   async function refreshClusterPicker() {
     try {
-      const data = await api.listClusters();
+      const [data, sum] = await Promise.all([api.listClusters(), api.summary().catch(() => ({}))]);
       knownClusters = data.clusters || [];
+      const hasInCluster = !!sum.k8s_connected;
+      // Auto-select a registered cluster the first time we see one and
+      // there's no in-cluster apiserver to fall back to (SaaS mode).
+      if (!activeCluster && !hasInCluster && knownClusters.length > 0) {
+        activeCluster = knownClusters[0].id;
+        lastSig = null;
+        // No rerender here — caller (tick / picker click) drives it.
+      }
       menu.innerHTML = '';
-      const inCluster = el('div','nav-item' + (activeCluster===''?' active':''),'in-cluster <span class="meta" style="margin-left:auto;font-size:11px;color:var(--muted-2)">default</span>');
-      inCluster.style.padding = '7px 10px';
-      inCluster.onclick = () => { activeCluster=''; setClusterLabel(); menu.style.display='none'; lastSig=null; rerender(); };
-      menu.append(inCluster);
+      if (hasInCluster) {
+        const inCluster = el('div','nav-item' + (activeCluster===''?' active':''),'in-cluster <span class="meta" style="margin-left:auto;font-size:11px;color:var(--muted-2)">default</span>');
+        inCluster.style.padding = '7px 10px';
+        inCluster.onclick = () => { activeCluster=''; setClusterLabel(); menu.style.display='none'; lastSig=null; rerender(); };
+        menu.append(inCluster);
+      }
+      if (!knownClusters.length && !hasInCluster) {
+        const empty = el('div','meta','No clusters registered. Add one from Admin → Clusters.');
+        empty.style.cssText = 'padding:10px 12px;font-size:11.5px';
+        menu.append(empty);
+      }
       knownClusters.forEach(c => {
-        const it = el('div','nav-item' + (activeCluster===c.id?' active':''), escapeHTML(c.name));
+        const onlineDot = c.online
+          ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#6ee7b7;margin-right:6px"></span>'
+          : '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#6a6e76;margin-right:6px"></span>';
+        const it = el('div','nav-item' + (activeCluster===c.id?' active':''), onlineDot + escapeHTML(c.name));
         it.style.padding = '7px 10px';
         it.onclick = () => { activeCluster=c.id; setClusterLabel(); menu.style.display='none'; lastSig=null; rerender(); };
         menu.append(it);

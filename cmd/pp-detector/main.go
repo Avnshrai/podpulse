@@ -136,7 +136,7 @@ func main() {
 			kubeconfigServer := strings.TrimRight(*externalURL, "/") + "/k8s"
 			userMgr = users.NewManager(client, kubeconfigServer)
 			userMgr.InsecureTLS = *kubeconfigInsecure
-			slog.Info("kubeconfig generator configured",
+			slog.Info("in-cluster kubeconfig generator configured",
 				"server", kubeconfigServer, "insecure_skip_tls", *kubeconfigInsecure)
 			go func() {
 				if err := k8sCache.Run(ctx, client, *resync); err != nil && ctx.Err() == nil {
@@ -203,21 +203,16 @@ func main() {
 		slog.Info("auth disabled — running single-tenant (no Postgres)")
 	}
 
-	// Wire cluster-scoped onboarding so /v1/clusters/{id}/users uses
-	// the per-cluster kubeconfig instead of the in-cluster default SA.
-	if userMgr != nil {
-		userMgr.ClusterLookup = func(clusterID string) (kubernetes.Interface, string, bool) {
-			id, err := uuid.Parse(clusterID)
-			if err != nil {
-				return nil, "", false
-			}
-			c, ok := clusterStore.Client(id)
-			if !ok {
-				return nil, "", false
-			}
-			url, _ := clusterStore.APIServerURL(id)
-			return c, url, true
-		}
+	// SaaS mode: when --k8s=false we still want cluster-scoped user
+	// onboarding to work for tunnel/kubeconfig clusters. Construct a
+	// Manager with no in-cluster client; ClusterLookup below provides
+	// per-cluster ones on demand.
+	if userMgr == nil {
+		kubeconfigServer := strings.TrimRight(*externalURL, "/") + "/k8s"
+		userMgr = users.NewManager(nil, kubeconfigServer)
+		userMgr.InsecureTLS = *kubeconfigInsecure
+		slog.Info("user manager initialized in SaaS mode (no in-cluster k8s)",
+			"server", kubeconfigServer, "insecure_skip_tls", *kubeconfigInsecure)
 	}
 
 	// Connect Hub: WebSocket endpoint where pp-connect agents dial in.
@@ -226,6 +221,42 @@ func main() {
 	if dbConn != nil {
 		connectHub = connect.NewHub(dbConn.Pool, logger)
 		slog.Info("agent-tunnel hub enabled — pp-connect agents can dial /v1/connect")
+	}
+
+	// Cluster-scoped onboarding lookup. Tries (in order):
+	//
+	//   1. Kubeconfig-mode clusters: read the typed client built from
+	//      the stored YAML.
+	//   2. Tunnel-mode clusters: ask the Hub for a clientset whose
+	//      Transport rides the agent's WebSocket.
+	//
+	// This is what makes "register a private cluster via agent → onboard
+	// users in it" work end-to-end on the SaaS demo, with no in-cluster
+	// k8s integration on the SaaS side.
+	userMgr.ClusterLookup = func(clusterID string) (kubernetes.Interface, string, bool) {
+		id, err := uuid.Parse(clusterID)
+		if err != nil {
+			return nil, "", false
+		}
+		// Kubeconfig path first.
+		if c, ok := clusterStore.Client(id); ok {
+			url, _ := clusterStore.APIServerURL(id)
+			return c, url, true
+		}
+		// Tunnel path.
+		if connectHub != nil && clusterStore.Mode(id) == "tunnel" {
+			c, err := connectHub.ClientForCluster(id)
+			if err != nil {
+				slog.Warn("tunnel client unavailable", "cluster_id", id, "err", err)
+				return nil, "", false
+			}
+			// The "apiserver URL" we hand back is what generated kubeconfigs
+			// will point at — for tunnel clusters that's PodPulse's own
+			// /k8s/<id> proxy, not the (private) apiserver hostname.
+			url := strings.TrimRight(*externalURL, "/") + "/k8s/" + id.String()
+			return c, url, true
+		}
+		return nil, "", false
 	}
 
 	// Mount the multi-cluster proxy. /k8s/<cluster_id>/... goes to the
