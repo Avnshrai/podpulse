@@ -1,0 +1,82 @@
+# Builds + pushes multi-arch container images to GHCR.
+#
+# Triggers:
+#   - push to main          → :latest + :sha-<short>
+#   - tag v*                → :<tag> (e.g. v0.2.0) + :latest
+#   - manual dispatch       → :latest
+#
+# Images:
+#   ghcr.io/<owner>/podpulse           — pp-detector + pp-tailer + podpulse CLI
+#   ghcr.io/<owner>/podpulse/pp-connect — cluster-tunnel agent
+#
+# After the first successful run, mark both packages PUBLIC:
+#   GitHub → your profile → Packages → <package> → Settings → Change visibility.
+# Otherwise customer kubelets get 403 ("failed to fetch anonymous token").
+
+name: Publish images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: podpulse
+            dockerfile: Dockerfile
+            image: ghcr.io/${{ github.repository_owner }}/podpulse
+          - name: pp-connect
+            dockerfile: Dockerfile.connect
+            image: ghcr.io/${{ github.repository_owner }}/podpulse/pp-connect
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: tags
+        run: |
+          IMG="${{ matrix.image }}"
+          # Lowercase the repo owner — Docker tags must be lowercase.
+          IMG_LC=$(echo "$IMG" | tr '[:upper:]' '[:lower:]')
+          SHA_SHORT="${GITHUB_SHA::7}"
+          TAGS="${IMG_LC}:latest,${IMG_LC}:sha-${SHA_SHORT}"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+            TAGS="${TAGS},${IMG_LC}:${VERSION}"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "Computed tags: ${TAGS}"
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to:   type=gha,scope=${{ matrix.name }},mode=max
