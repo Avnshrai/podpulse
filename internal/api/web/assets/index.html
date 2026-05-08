@@ -696,11 +696,16 @@
 
   /* Audit table tweaks */
   .audit-row {
-    display: grid; grid-template-columns: 80px 110px 70px 1fr 70px;
-    gap: 12px; padding: 8px 0;
+    display: grid;
+    /* Time | User | Method | Path | Status. Each cell needs min-width:0
+       so long content wraps inside the cell instead of pushing the
+       grid column wider (which would overlap the next column). */
+    grid-template-columns: 80px minmax(180px, 220px) 70px minmax(0, 1fr) 70px;
+    gap: 16px; padding: 10px 0;
     border-bottom: 1px solid var(--border);
     font-size: 12.5px; align-items: start;
   }
+  .audit-row > * { min-width: 0; overflow-wrap: anywhere; }
 
   /* What changed timeline */
   .tl-row {
@@ -1865,7 +1870,14 @@
             const r = el('div','audit-row');
             const statusCls = ev.status >= 500 ? 'high' : ev.status >= 400 ? 'med' : 'low';
             const clusterShort = ev.cluster_id ? ev.cluster_id.slice(0,8) : '—';
-            r.innerHTML = `<div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(ev.time)}</div><div><strong>${escapeHTML(ev.user||'anonymous')}</strong><div class="meta">cluster ${escapeHTML(clusterShort)}</div></div><div style="color:var(--muted-2);text-transform:uppercase;font-size:11px">${escapeHTML(ev.method||'')}</div><div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;word-break:break-all">${escapeHTML(ev.path||'')}<div class="meta">${ev.duration_ms||0} ms${ev.client_ip?' · '+escapeHTML(ev.client_ip):''}</div></div><div><span class="imp-label ${statusCls}">${ev.status||'?'}</span></div>`;
+            // K8s identities come in as `system:serviceaccount:<ns>:<name>`
+            // — too long to render inline. Show just the trailing name,
+            // surface ns as meta, and keep the full identity on hover.
+            const fullActor = ev.user || 'anonymous';
+            const m = /^system:serviceaccount:([^:]+):(.+)$/.exec(fullActor);
+            const actorName = m ? m[2] : fullActor;
+            const actorMeta = m ? ('ns ' + m[1] + ' · cluster ' + clusterShort) : ('cluster ' + clusterShort);
+            r.innerHTML = `<div style="color:var(--muted-2);font-variant-numeric:tabular-nums">${fmtTime(ev.time)}</div><div title="${escapeHTML(fullActor)}"><strong>${escapeHTML(actorName)}</strong><div class="meta">${escapeHTML(actorMeta)}</div></div><div style="color:var(--muted-2);text-transform:uppercase;font-size:11px">${escapeHTML(ev.method||'')}</div><div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px">${escapeHTML(ev.path||'')}<div class="meta">${ev.duration_ms||0} ms${ev.client_ip?' · '+escapeHTML(ev.client_ip):''}</div></div><div><span class="imp-label ${statusCls}">${ev.status||'?'}</span></div>`;
             pcard.append(r);
           });
         }
