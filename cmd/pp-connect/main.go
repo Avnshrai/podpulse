@@ -179,11 +179,23 @@ func buildTLSConfig(caPath string, insecure bool, serverName string) (*tls.Confi
 }
 
 // newAPIServerProxy returns a reverse proxy that forwards every
-// request to the in-cluster apiserver, replacing the Authorization
-// header with the agent's SA token. The token is re-read from disk on
-// every request — projected SA tokens auto-rotate (default ≤1h
-// expiry, kubelet refreshes the file before expiry), so caching the
-// startup value would cause 401 Unauthorized after the first rotation.
+// request to the in-cluster apiserver. Critical RBAC behavior: the
+// agent's cluster-admin ServiceAccount token is ONLY injected when
+// the incoming request has no Authorization header. End-user kubectl
+// traffic arrives with the user's scoped SA bearer (issued by
+// PodPulse's TokenRequest flow); we MUST forward that unmodified so
+// the apiserver authenticates the user as their scoped identity, not
+// as `pp-connect` (which has cluster-admin and would silently grant
+// every scoped user full cluster access).
+//
+// SaaS-initiated admin calls (cluster onboarding — Create SA / Role /
+// RoleBinding) come in unauthenticated because the SaaS process
+// holds no in-cluster token; for those we DO inject the agent's SA
+// token so the apiserver sees pp-connect as the actor.
+//
+// Token rotation: projected SA tokens expire (default ≤1h, kubelet
+// rewrites the file before expiry). tokenSource.Get() re-reads with
+// a 30s TTL, so caching the startup value can't cause 401 drift.
 func newAPIServerProxy(target *url.URL, tlsCfg *tls.Config, tokens *tokenSource) http.Handler {
 	rp := httputil.NewSingleHostReverseProxy(target)
 	rp.FlushInterval = -1
@@ -199,8 +211,12 @@ func newAPIServerProxy(target *url.URL, tlsCfg *tls.Config, tokens *tokenSource)
 	rp.Director = func(req *http.Request) {
 		origDirector(req)
 		req.Host = target.Host
-		if t := tokens.Get(); t != "" {
-			req.Header.Set("Authorization", "Bearer "+t)
+		// PRESERVE the caller's Authorization. Only fall back to the
+		// agent's SA token when nothing was supplied.
+		if req.Header.Get("Authorization") == "" {
+			if t := tokens.Get(); t != "" {
+				req.Header.Set("Authorization", "Bearer "+t)
+			}
 		}
 		// Don't forward Host header from upstream — apiserver expects its own.
 		req.Header.Del("X-Forwarded-Host")
