@@ -2,8 +2,14 @@
 
 image:
   registry: ghcr.io
-  repository: podpulse/podpulse
-  tag: ""              # defaults to .Chart.AppVersion
+  # Matches the GHCR namespace the publish-images workflow pushes to
+  # (.github/workflows/publish-images.yml uses ${{ github.repository_owner }}).
+  # If you fork the repo, point this at your own org/user before installing.
+  repository: avnshrai/podpulse
+  # CI pushes :latest and :sha-<short>. We default to :latest so a plain
+  # `helm install` Just Works. Pin to :sha-<short> in production via
+  # --set image.tag=sha-abcdef0 for immutability.
+  tag: latest
   pullPolicy: IfNotPresent
 
 detector:
