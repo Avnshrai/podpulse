@@ -265,6 +265,13 @@ func isPublicPath(p string) bool {
 		// WS endpoint — pp-connect agent authenticates with its own
 		// pairing token (X-PodPulse-Token header), not a session cookie.
 		return true
+	case "/v1/ingest":
+		// Log-line ingest from pp-tailer (or the bundled podpulse-demo
+		// synthetic feeder). Not session-gated — tailers run in-cluster
+		// with no human identity. Per-cluster ingest tokens are the
+		// proper SaaS-grade fix; for now this matches pre-auth behavior
+		// so multi-tenant mode doesn't silently break ingest.
+		return true
 	}
 	if strings.HasPrefix(p, "/v1/auth/") {
 		return true
