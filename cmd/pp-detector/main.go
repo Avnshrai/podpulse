@@ -220,6 +220,18 @@ func main() {
 	var connectHub *connect.Hub
 	if dbConn != nil {
 		connectHub = connect.NewHub(dbConn.Pool, logger)
+		// Refresh the in-memory clusters cache when an agent registers.
+		// Hub inserts the row directly via SQL, but clusterStore.List()
+		// reads from its own map — without this hook, the freshly-paired
+		// cluster won't appear in /v1/clusters until the process restarts.
+		connectHub.OnClusterRegistered = func(id uuid.UUID) {
+			refreshCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := clusterStore.RefreshFromDB(refreshCtx, id); err != nil {
+				slog.Warn("could not refresh clusters cache after agent registration",
+					"cluster_id", id, "err", err)
+			}
+		}
 		slog.Info("agent-tunnel hub enabled — pp-connect agents can dial /v1/connect")
 	}
 

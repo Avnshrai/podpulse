@@ -71,6 +71,12 @@ type Hub struct {
 	mu      sync.RWMutex
 	online  map[uuid.UUID]*tunnelInfo // cluster_id → live tunnel info
 	pending map[string]chan uuid.UUID // pairing_token → "first connect" notify
+
+	// OnClusterRegistered fires after a successful authorize() with the
+	// resolved cluster_id. Used by the detector to refresh the
+	// clusters.Store in-memory cache so freshly-paired tunnel clusters
+	// show up in /v1/clusters without restarting the process. nil-safe.
+	OnClusterRegistered func(id uuid.UUID)
 }
 
 type tunnelInfo struct {
@@ -137,6 +143,14 @@ func (h *Hub) authorize(req *http.Request) (string, bool, error) {
 	}
 
 	h.markOnline(req.Context(), clusterID, info, true)
+
+	// Push the DB state into the in-memory clusters.Store cache so the
+	// row is visible to /v1/clusters immediately (without waiting for
+	// a process restart). The Hub creates rows via direct SQL — the
+	// detector's Store doesn't know they exist otherwise.
+	if h.OnClusterRegistered != nil {
+		h.OnClusterRegistered(clusterID)
+	}
 
 	go h.watchClose(clusterID, token)
 
